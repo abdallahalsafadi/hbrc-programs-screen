@@ -5,7 +5,6 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>شاشة البرامج</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Tajawal:400,700&amp;subset=arabic">
 <style>
 *{margin:0;padding:0;-webkit-box-sizing:border-box;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:#F6F7F7;color:#0D1010;font-family:Tajawal,Tahoma,Arial,sans-serif}
@@ -47,10 +46,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:#F6F7F7;color:#0D101
   <div id="logos"><img id="fLogo" src="logo.svg" alt=""><span class="sep"></span><img id="cLogo" src="centre-logo.jpg" alt=""><span id="centreName" style="display:none"></span></div>
   <div id="clock"><div id="time"></div><div id="date"></div></div>
 </div>
-<div id="stage"><div id="msg">جارٍ التحميل…</div></div>
+<div id="stage"><div id="msg">جارٍ التحميل… (0/2)</div></div>
 <div id="dots"></div>
 <div class="vid" id="vid"></div>
-<script src="config.js?v=3"></script>
+<script src="config.js?v=4"></script>
 <script>
 window.onerror = function (m, u, l) { var e = document.getElementById('msg'); if (e) e.innerHTML = 'خطأ: ' + m + ' (' + l + ')'; };
 (function () {
@@ -68,16 +67,23 @@ window.onerror = function (m, u, l) { var e = document.getElementById('msg'); if
   function okUrl(u) { u = String(u || ''); return /^(https?:\/\/|data:image\/|[a-z0-9_\/.-]+\.(png|jpe?g|svg|webp|gif|mp4|webm)$)/i.test(u) ? u.replace(/^assets\//, '') : ''; }
   function merge(a, b) { var o = {}, k; for (k in a) o[k] = a[k]; for (k in b) if (b[k] !== undefined && b[k] !== null) o[k] = b[k]; return o; }
   function get(path, cb) {
-    var x = new XMLHttpRequest();
-    x.open('GET', URL + '/rest/v1/' + path, true);
-    x.setRequestHeader('apikey', KEY);
-    x.onreadystatechange = function () {
-      if (x.readyState !== 4) return;
-      if (x.status >= 200 && x.status < 300) { try { cb(null, JSON.parse(x.responseText)); } catch (e) { cb(e); } }
-      else cb(new Error('HTTP ' + x.status));
-    };
-    x.send();
+    var done = false, x;
+    function fin(err, data) { if (done) return; done = true; cb(err, data); }
+    try {
+      x = new XMLHttpRequest();
+      var u = URL + '/rest/v1/' + path + (path.indexOf('?') > -1 ? '&' : '?') + 'apikey=' + encodeURIComponent(KEY);
+      x.open('GET', u, true);
+      x.onreadystatechange = function () {
+        if (x.readyState !== 4) return;
+        if (x.status >= 200 && x.status < 300) { try { fin(null, JSON.parse(x.responseText)); } catch (e) { fin(new Error('JSON')); } }
+        else fin(new Error('HTTP ' + x.status));
+      };
+      x.onerror = function () { fin(new Error('NET')); };
+      x.send(null);
+    } catch (e) { fin(new Error('XHR ' + e.message)); }
+    setTimeout(function () { try { x.abort(); } catch (e) {} fin(new Error('TIMEOUT')); }, 20000);
   }
+  function say(t) { var e = $('msg'); if (e) e.innerHTML = t; }
   function toD(s) { var p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
   function today() { var d = new Date(); d.setHours(0,0,0,0); return d; }
   function daysTo(s) { return Math.round((toD(s) - today()) / 864e5); }
@@ -109,12 +115,14 @@ window.onerror = function (m, u, l) { var e = document.getElementById('msg'); if
 
   function load() {
     if (!URL || !KEY) { $('msg').innerHTML = 'لم يتم ربط قاعدة البيانات'; return; }
+    if (!sig) say('جارٍ الاتصال بقاعدة البيانات… (1/2)');
     get('settings?select=data&id=eq.1', function (e1, st) {
+      if (!sig && !e1) say('جارٍ تحميل البرامج… (2/2)');
       get('programs?select=*&visible=eq.true&order=sort_order.asc', function (e2, pr) {
         if (e1 || e2) {
           var cached = null; try { cached = JSON.parse(localStorage.getItem('hbrc_lite')); } catch (x) {}
           if (cached && !sig) { apply(cached[0], cached[1]); }
-          else if (!sig) $('msg').innerHTML = 'تعذّر الاتصال — ستتم المحاولة مجدداً';
+          else if (!sig) say('تعذّر الاتصال — ستتم المحاولة مجدداً<br><small style="font-size:1.3vw;color:#aaa">' + esc((e1 || e2).message) + ' · ' + esc(navigator.userAgent) + '</small>');
           return;
         }
         var s = (st && st[0] && st[0].data) || {};
