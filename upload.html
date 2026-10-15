@@ -7,10 +7,10 @@
 <title>رفع محتوى</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css?v=13">
-<script src="config.js?v=13"></script>
+<link rel="stylesheet" href="style.css?v=15">
+<script src="config.js?v=15"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=13"></script>
+<script src="common.js?v=15"></script>
 <style>
   .up-wrap{max-width:760px;margin:0 auto;padding:0 16px 48px}
   .up-head{display:flex;align-items:center;justify-content:center;gap:22px;padding:22px 0;flex-wrap:wrap}
@@ -25,6 +25,17 @@
   .done{text-align:center;padding:30px 10px}
   .done .big{font-size:3.2rem;color:var(--ok)}
   .filelist{margin-top:10px;font-size:.9rem;color:var(--muted)}
+  .prog{display:grid;gap:10px;margin-top:6px}
+  .pi{border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;background:#fff}
+  .pi .top{display:flex;justify-content:space-between;gap:10px;font-weight:700;font-size:.95rem}
+  .pi .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:right}
+  .pi .bar{height:12px;border-radius:99px;background:var(--gray-soft);overflow:hidden;margin-top:8px}
+  .pi .bar i{display:block;height:100%;width:0;background:var(--primary);border-radius:99px;transition:width .3s}
+  .pi.ok{border-color:var(--ok)} .pi.ok .bar i{background:var(--ok);width:100%}
+  .pi.er{border-color:var(--danger)} .pi.er .bar i{background:var(--danger);width:100%}
+  .pi .msg{font-size:.85rem;margin-top:6px;color:var(--muted)}
+  .pi.er .msg{color:var(--danger)} .pi.ok .msg{color:var(--ok)}
+  .busy-note{background:#FBF0D9;color:#8A5A00;border-radius:12px;padding:10px 14px;font-weight:700;margin-top:14px;text-align:center}
 </style>
 </head>
 <body>
@@ -54,13 +65,36 @@
   const say = (m, cls) => { $('#st').innerHTML = `<span class="${cls || ''}">${m}</span>`; };
   const ERR = { link_expired: 'انتهت صلاحية الرابط', title_required: 'اسم البرنامج مطلوب', bad_url: 'رابط يوتيوب غير صحيح', bad_file: 'تعذّر التحقق من الملف' };
   const errMsg = e => { const m = (e && e.message) || ''; for (const k in ERR) if (m.indexOf(k) > -1) return ERR[k]; return m || 'حدث خطأ'; };
-  async function upload(file, folder) {
+  // رفع مع شريط تقدّم (XHR)، مع بديل احتياطي عبر المكتبة
+  function upload(file, folder, onProg) {
     const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
     const path = `inbox/${t}/${folder}-${rnd()}.${ext}`;
-    const { error } = await sb.storage.from('media').upload(path, file, { contentType: file.type, upsert: false });
-    if (error) throw new Error(/exceeded|size/i.test(error.message) ? 'الملف أكبر من الحد المسموح' : 'تعذّر رفع الملف — ' + error.message);
-    return { path, url: sb.storage.from('media').getPublicUrl(path).data.publicUrl };
+    const pub = () => ({ path, url: sb.storage.from('media').getPublicUrl(path).data.publicUrl });
+    const viaLib = async () => {
+      const { error } = await sb.storage.from('media').upload(path, file, { contentType: file.type, upsert: false });
+      if (error) throw new Error(/exceeded|size|too large/i.test(error.message) ? 'الملف أكبر من الحد المسموح' : 'تعذّر رفع الملف — ' + error.message);
+      if (onProg) onProg(100); return pub();
+    };
+    return new Promise((resolve, reject) => {
+      const x = new XMLHttpRequest();
+      x.open('POST', CFG.SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/media/' + path);
+      x.setRequestHeader('apikey', CFG.SUPABASE_ANON_KEY);
+      x.setRequestHeader('Authorization', 'Bearer ' + CFG.SUPABASE_ANON_KEY);
+      x.setRequestHeader('x-upsert', 'false');
+      x.setRequestHeader('cache-control', 'max-age=31536000');
+      x.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      x.upload.onprogress = e => { if (e.lengthComputable && onProg) onProg(Math.min(99, Math.round(e.loaded / e.total * 100))); };
+      x.onload = () => {
+        if (x.status >= 200 && x.status < 300) { if (onProg) onProg(100); return resolve(pub()); }
+        if (x.status === 413) return reject(new Error('الملف أكبر من الحد المسموح'));
+        viaLib().then(resolve, reject);   // مشكلة صلاحيات/صيغة: نجرّب الطريقة البديلة
+      };
+      x.onerror = () => viaLib().then(resolve, reject);
+      x.send(file);
+    });
   }
+  let busyNow = false;
+  window.addEventListener('beforeunload', e => { if (busyNow) { e.preventDefault(); e.returnValue = ''; } });
   setInterval(() => { const e = $('#exp'); if (e) e.textContent = left(); }, 30000);
 
   if (info.kind === 'video') {
@@ -73,37 +107,54 @@
         <div class="field"><label for="title">عنوان الفيديو (اختياري)</label><input type="text" id="title" maxlength="150"></div>
         <div class="field full"><span class="label">ملف الفيديو</span><label class="btn" for="file">اختر ملف أو عدة ملفات MP4…</label><input type="file" id="file" accept="video/mp4,.mp4" multiple hidden><div class="filelist" id="fl"></div></div>
         <div class="field full"><div class="or">— أو —</div><label for="yt">رابط يوتيوب</label><input type="url" id="yt" dir="ltr" placeholder="https://youtu.be/..."></div>
-        <div class="field full"><button class="btn primary" type="submit" id="go">إرسال</button><div class="status" id="st"></div></div>
+        <div class="field full"><button class="btn primary" type="submit" id="go">إرسال</button><div class="status" id="st"></div><div class="prog" id="prog"></div></div>
       </form>`;
     $('#file').addEventListener('change', e => { $('#fl').textContent = [...e.target.files].map(f => `${f.name} (${(f.size / 1048576).toFixed(1)} MB)`).join(' · '); });
     $('#f').addEventListener('submit', async e => {
       e.preventDefault();
       const files = [...$('#file').files], yt = $('#yt').value.trim(), sender = $('#sender').value.trim(), title = $('#title').value.trim();
       if (!files.length && !yt) return say('اختر ملف فيديو أو أدخل رابط يوتيوب', 'er');
-      const btn = $('#go'); btn.disabled = true;
+      const btn = $('#go'); btn.disabled = true; btn.textContent = 'جارٍ الإرسال…';
+      $('#f').querySelectorAll('input, label.btn').forEach(el => { el.style.pointerEvents = 'none'; el.style.opacity = '.6'; });
+      busyNow = true; say('');
+      const items = files.map(f => ({ name: f.name, size: f.size }));
+      if (yt) items.push({ name: 'رابط يوتيوب', size: 0 });
+      $('#prog').innerHTML = items.map((it, i) => `<div class="pi" id="pi${i}"><div class="top"><span class="nm">${esc(it.name)}</span><span class="pc" id="pc${i}">بالانتظار</span></div><div class="bar"><i id="pb${i}"></i></div><div class="msg" id="pm${i}">${it.size ? (it.size / 1048576).toFixed(1) + ' ميغابايت' : ''}</div></div>`).join('') + '<div class="busy-note" id="bn">⏳ جارٍ الرفع — لا تغلق الصفحة حتى تظهر علامة ✓</div>';
+      $('#prog').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const setP = (i, pct, txt) => { $('#pb' + i).style.width = pct + '%'; $('#pc' + i).textContent = txt || pct + '%'; };
+      const setDone = (i, okk, msg) => { const el = $('#pi' + i); el.classList.add(okk ? 'ok' : 'er'); $('#pc' + i).textContent = okk ? '✓ تم' : '✕ لم يُرفع'; $('#pm' + i).textContent = msg; };
       let ok = 0; const errs = [];
       try {
         for (let i = 0; i < files.length; i++) {
           const f = files[i];
           try {
-            say(`جارٍ فحص ${f.name}…`);
+            setP(i, 0, 'جارٍ الفحص…');
             const meta = await checkVideo(f);
-            say(`جارٍ رفع ${i + 1} من ${files.length}: ${f.name} — لا تغلق الصفحة`);
-            const u = await upload(f, 'v');
+            if (meta && meta.lowQuality && !confirm(`«${f.name}»\n${meta.warn}\n\nهل تريد رفعه رغم ذلك؟`)) throw new Error('أُلغي الرفع — ' + meta.warn);
+            setP(i, 0, '0%');
+            const u = await upload(f, 'v', pct => setP(i, pct));
+            setP(i, 100, 'جارٍ الحفظ…');
             const { error } = await sb.rpc('submit_video', { t, v: { kind: 'file', url: u.url, path: u.path, title: files.length > 1 ? (title ? title + ' — ' : '') + f.name.replace(/\.[^.]+$/, '') : (title || f.name.replace(/\.[^.]+$/, '')), sender } });
             if (error) throw error;
             ok++;
-            if (meta && meta.portrait) errs.push(`«${f.name}» عمودي — يُفضّل الفيديو الأفقي للشاشة`);
-          } catch (er) { errs.push(errMsg(er)); }
+            setDone(i, true, meta && meta.warn ? 'تم الرفع — تنبيه: ' + meta.warn : (meta && meta.portrait ? 'تم الرفع — ملاحظة: الفيديو عمودي، يُفضّل الأفقي للشاشة' : 'تم الرفع بنجاح'));
+          } catch (er) { errs.push(errMsg(er)); setDone(i, false, errMsg(er)); }
         }
         if (yt) {
+          const i = files.length; setP(i, 50, 'جارٍ الإرسال…');
           const { error } = await sb.rpc('submit_video', { t, v: { kind: 'youtube', url: yt, title, sender } });
-          if (error) errs.push(errMsg(error)); else ok++;
+          if (error) { errs.push(errMsg(error)); setDone(i, false, errMsg(error)); } else { ok++; setDone(i, true, 'تم الإرسال'); }
         }
-      } finally { btn.disabled = false; }
+      } finally { busyNow = false; }
+      $('#bn').remove();
       if (ok) {
-        card.innerHTML = `<div class="done"><div class="big">✓</div><h1>شكراً، تم الإرسال (${ok})</h1><p class="hint">سيظهر على الشاشة بعد موافقة المشرف.</p>${errs.length ? `<p class="hint" style="color:var(--danger)">${errs.map(esc).join('<br>')}</p>` : ''}<p><a class="btn" href="${esc(location.href)}">إرسال فيديو آخر</a></p></div>`;
-      } else say(errs.map(esc).join('<br>'), 'er');
+        const list = $('#prog').innerHTML;
+        card.innerHTML = `<div class="done"><div class="big">✓</div><h1>${errs.length ? `تم رفع ${ok} من ${items.length}` : 'اكتمل الرفع بنجاح'}</h1><p class="hint">سيظهر على الشاشة بعد موافقة المشرف.</p></div><div class="prog">${list}</div><p style="text-align:center;margin-top:18px"><a class="btn" href="${esc(location.href)}">إرسال فيديو آخر</a></p>`;
+      } else {
+        btn.disabled = false; btn.textContent = 'إرسال';
+        $('#f').querySelectorAll('input, label.btn').forEach(el => { el.style.pointerEvents = ''; el.style.opacity = ''; });
+        say('لم يُرفع أي فيديو — راجع الأسباب أعلاه وحاول مجدداً', 'er');
+      }
     });
   } else {
     document.title = 'إضافة برنامج — ' + info.name;
@@ -124,21 +175,21 @@
       const title = $('#title').value.trim(); if (!title) return say('اسم البرنامج مطلوب', 'er');
       const sd = $('#sd').value, ed = $('#ed').value;
       if (sd && ed && ed < sd) return say('تاريخ الانتهاء قبل تاريخ البدء', 'er');
-      const btn = $('#go'); btn.disabled = true;
+      const btn = $('#go'); btn.disabled = true; btn.textContent = 'جارٍ الإرسال…'; busyNow = true;
       try {
         let logo_url = '';
         const lf = $('#logo').files[0];
         if (lf) {
           if (!lf.type.startsWith('image/')) throw new Error('الشعار يجب أن يكون صورة');
           if (lf.size > 5 * 1048576) throw new Error('الصورة أكبر من 5 ميغابايت');
-          say('جارٍ رفع الشعار…'); logo_url = (await upload(lf, 'logo')).url;
+          logo_url = (await upload(lf, 'logo', pct => say(`جارٍ رفع الشعار… ${pct}%`))).url;
         }
         say('جارٍ الإرسال…');
         const { error } = await sb.rpc('submit_program', { t, p: { title, owner: $('#owner').value.trim(), status: $('#status').value, start_date: sd, end_date: ed, logo_url } });
         if (error) throw error;
         card.innerHTML = `<div class="done"><div class="big">✓</div><h1>شكراً، تم إرسال البرنامج</h1><p class="hint">سيظهر على الشاشة بعد موافقة المشرف.</p><p><a class="btn" href="${esc(location.href)}">إرسال برنامج آخر</a></p></div>`;
       } catch (er) { say(esc(errMsg(er)), 'er'); }
-      finally { btn.disabled = false; }
+      finally { busyNow = false; if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = 'إرسال البرنامج'; } }
     });
   }
 })();

@@ -53,12 +53,48 @@
 
   // قواعد رفع الفيديو
   const VIDEO_RULES = { maxMB: 50, maxSec: 180, types: ['video/mp4'] };
-  const VIDEO_RULES_TEXT = ['الصيغة: MP4 فقط', 'الحجم: حتى 50 ميغابايت للملف', 'المدة: حتى 3 دقائق', 'الدقة المفضّلة: 1920×1080 أفقي (16:9)'];
+  const VIDEO_RULES_TEXT = ['الصيغة: MP4 فقط', 'الحجم: حتى 50 ميغابايت للملف', 'المدة: حتى 3 دقائق', 'الدقة المفضّلة: 1920×1080 أفقي (16:9)', 'لأفضل جودة: أرسل الملف الأصلي من الكاميرا أو من برنامج المونتاج — لا ترسل نسخة منقولة عبر واتساب لأنها تكون مضغوطة', 'الفيديو الأطول أو الأكبر من 50 ميغابايت: ارفعه على يوتيوب (غير مُدرج) وأرسل الرابط — يُعرض بجودة عالية'];
   function checkVideo(file) {
     return new Promise((resolve, reject) => {
       const isMp4 = VIDEO_RULES.types.includes(file.type) || /\.mp4$/i.test(file.name);
       if (!isMp4) return reject(new Error(`«${file.name}»: الصيغة غير مقبولة — MP4 فقط`));
       if (file.size > VIDEO_RULES.maxMB * 1024 * 1024) return reject(new Error(`«${file.name}»: الحجم ${(file.size / 1048576).toFixed(0)} ميغابايت — الحد الأقصى ${VIDEO_RULES.maxMB}`));
+      // قراءة المدة مباشرة من ملف MP4 (صندوق mvhd) — لا تعتمد على قدرة المتصفح على تشغيل الفيديو
+      const mp4Info = async () => {
+        const out = { duration: null, width: 0, height: 0 };
+        try {
+          const buf = new Uint8Array(await file.arrayBuffer());
+          for (let i = 4; i < buf.length - 96; i++) {
+            if (buf[i] !== 0x6d && buf[i] !== 0x74) continue;
+            const a = buf[i], b = buf[i + 1], c = buf[i + 2], d = buf[i + 3];
+            if (a === 0x6d && b === 0x76 && c === 0x68 && d === 0x64 && out.duration == null) {        // 'mvhd' = المدة
+              const dv = new DataView(buf.buffer, buf.byteOffset + i), ver = dv.getUint8(4);
+              const ts = ver === 1 ? dv.getUint32(24) : dv.getUint32(16);
+              const du = ver === 1 ? dv.getUint32(28) * 4294967296 + dv.getUint32(32) : dv.getUint32(20);
+              if (ts > 0) out.duration = du / ts;
+            } else if (a === 0x74 && b === 0x6b && c === 0x68 && d === 0x64) {                          // 'tkhd' = أبعاد الصورة
+              const dv = new DataView(buf.buffer, buf.byteOffset + i), ver = dv.getUint8(4);
+              const o = ver === 1 ? 92 : 80;
+              const w = dv.getUint32(o) / 65536, h = dv.getUint32(o + 4) / 65536;
+              if (w * h > out.width * out.height) { out.width = Math.round(w); out.height = Math.round(h); }
+            }
+          }
+        } catch (e) {}
+        return out;
+      };
+      // تقدير الجودة: الدقة ومعدّل البيانات (ميغابت/ثانية)
+      const quality = (dur, w, h) => {
+        const mbps = dur ? (file.size * 8 / 1e6) / dur : null;
+        const short = Math.min(w || 0, h || 0);
+        let warn = '';
+        if (short && short < 720) warn = `دقة منخفضة (${w}×${h}) — ستبدو غير واضحة على الشاشة الكبيرة. أرسل الملف الأصلي بدقة 1080p.`;
+        else if (mbps != null && mbps < 2.5) warn = `الملف مضغوط بشدة (${mbps.toFixed(1)} ميغابت/ث) — قد تظهر الصورة ضبابية. أرسل الملف الأصلي وليس نسخة من واتساب.`;
+        return { duration: dur, width: w, height: h, mbps, portrait: h > w, lowQuality: !!warn, warn };
+      };
+      const tooLong = d => d > VIDEO_RULES.maxSec ? new Error(`«${file.name}»: المدة ${Math.floor(d / 60)}:${String(Math.round(d % 60)).padStart(2, '0')} — الحد الأقصى ${VIDEO_RULES.maxSec / 60} دقائق`) : null;
+      mp4Info().then(mi => {
+        const fd = mi.duration;
+        if (fd != null && tooLong(fd)) return reject(tooLong(fd));
       const v = document.createElement('video'), url = URL.createObjectURL(file);
       let done = false;
       const fin = (err, info) => { if (done) return; done = true; URL.revokeObjectURL(url); err ? reject(err) : resolve(info); };
@@ -66,11 +102,12 @@
       v.onloadedmetadata = () => {
         const d = v.duration;
         if (isFinite(d) && d > VIDEO_RULES.maxSec) return fin(new Error(`«${file.name}»: المدة ${Math.floor(d / 60)}:${String(Math.round(d % 60)).padStart(2, '0')} — الحد الأقصى ${VIDEO_RULES.maxSec / 60} دقائق`));
-        fin(null, { duration: d, width: v.videoWidth, height: v.videoHeight, portrait: v.videoHeight > v.videoWidth });
+        fin(null, quality(isFinite(d) ? d : fd, v.videoWidth || mi.width, v.videoHeight || mi.height));
       };
-      v.onerror = () => fin(null, { duration: null });   // بعض المتصفحات لا تقرأ الملف — نكتفي بفحص الحجم والصيغة
-      setTimeout(() => fin(null, { duration: null }), 8000);
+      v.onerror = () => fin(null, quality(fd, mi.width, mi.height));   // المتصفح لا يشغّل الملف — نعتمد على ما قرأناه من الملف
+      setTimeout(() => fin(null, quality(fd, mi.width, mi.height)), 8000);
       v.src = url;
+      });
     });
   }
 
