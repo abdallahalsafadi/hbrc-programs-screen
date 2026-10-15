@@ -7,10 +7,10 @@
 <title>رفع محتوى</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css?v=12">
-<script src="config.js?v=12"></script>
+<link rel="stylesheet" href="style.css?v=13">
+<script src="config.js?v=13"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=12"></script>
+<script src="common.js?v=13"></script>
 <style>
   .up-wrap{max-width:760px;margin:0 auto;padding:0 16px 48px}
   .up-head{display:flex;align-items:center;justify-content:center;gap:22px;padding:22px 0;flex-wrap:wrap}
@@ -35,7 +35,11 @@
 <script>
 (async function () {
   'use strict';
-  const { sb, esc, checkVideo, VIDEO_RULES_TEXT, toast } = App;
+  const { esc, checkVideo, VIDEO_RULES_TEXT } = App;
+  // عميل مستقل دائماً كزائر (حتى لو كان المشرف مسجّلاً في نفس المتصفح)
+  const CFG = window.APP_CONFIG || {};
+  const sb = window.supabase && CFG.SUPABASE_URL ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'hbrc-upload-anon' } }) : null;
   const $ = s => document.querySelector(s);
   const t = new URLSearchParams(location.search).get('t') || '';
   const card = $('#card');
