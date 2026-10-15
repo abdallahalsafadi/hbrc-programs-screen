@@ -304,14 +304,18 @@
 
 
   /* ========== الفيديو ========== */
-  const MODES = [['programs', 'البرامج فقط'], ['videos', 'الفيديو فقط'], ['both', 'البرامج ثم الفيديو']];
+  const MODES = [['programs', 'البرامج فقط'], ['videos', 'الفيديو فقط'], ['both', 'البرامج ثم الفيديو'], ['mix', 'مزج الفيديو بين الشرائح']];
   function renderVideos() {
     const V = S.videos || [];
     $('#vidMode').innerHTML = MODES.map(([k, l]) => `<label class="check"><input type="radio" name="vmode" value="${k}" ${(S.displayMode || 'programs') === k ? 'checked' : ''}> ${l}</label>`).join('');
     $('#vidSound').checked = !!S.videoSound;
     $('#vidRepeat').value = S.progRepeat || 1;
+    $('#vidEvery').value = S.mixEvery || 2;
+    const m = S.displayMode || 'programs';
+    $('#repeatField').hidden = m !== 'both';
+    $('#everyField').hidden = m !== 'mix';
     $('#vidRows').innerHTML = V.length ? V.map((v, i) => `<div class="row ${v.visible === false ? 'hidden-prog' : ''}" data-i="${i}">
-        <div class="thumb">${icons.video}</div>
+        <div class="thumb" style="font-size:1.2rem">${i + 1}</div>
         <div><h3>${esc(v.title || (v.kind === 'youtube' ? 'فيديو يوتيوب' : 'فيديو مرفوع'))}</h3>
           <div class="sub"><span class="badge ${v.kind === 'youtube' ? 'st-upcoming' : 'st-current'}">${v.kind === 'youtube' ? 'يوتيوب' : 'ملف مرفوع'}</span>${v.visible === false ? '<b>مخفي</b>' : ''}</div></div>
         <div class="row-actions">
@@ -326,6 +330,7 @@
   $('#vidMode').addEventListener('change', e => { S.displayMode = e.target.value; busy(null, () => saveVideos('تم تغيير وضع العرض')); });
   $('#vidSound').addEventListener('change', e => { S.videoSound = e.target.checked; busy(null, () => saveVideos('تم الحفظ')); });
   $('#vidRepeat').addEventListener('change', e => { S.progRepeat = Math.min(10, Math.max(1, parseInt(e.target.value, 10) || 1)); e.target.value = S.progRepeat; busy(null, () => saveVideos('تم الحفظ')); });
+  $('#vidEvery').addEventListener('change', e => { S.mixEvery = Math.min(10, Math.max(1, parseInt(e.target.value, 10) || 2)); e.target.value = S.mixEvery; busy(null, () => saveVideos('تم الحفظ')); });
   $('#ytAdd').addEventListener('click', () => {
     const url = $('#ytUrl').value.trim();
     if (!/(youtu\.be\/|v=|\/shorts\/|\/embed\/|\/live\/)[\w-]{11}/.test(url)) return toast('رابط يوتيوب غير صحيح', 'err');
@@ -333,14 +338,20 @@
     busy($('#ytAdd'), async () => { await saveVideos('تمت إضافة الفيديو'); $('#ytUrl').value = ''; $('#vidTitle').value = ''; });
   });
   $('#vidFile').addEventListener('change', async e => {
-    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-    const lbl = $('#vidFileLbl'), t = lbl.textContent; lbl.textContent = 'جارٍ الرفع… لا تغلق الصفحة';
-    try {
-      const { url, path } = await Store.uploadFile(f, 'video');
-      S.videos = [...(S.videos || []), { id: Date.now().toString(36), kind: 'file', url, path, title: $('#vidTitle').value.trim(), visible: true }];
-      await saveVideos('تم رفع الفيديو'); $('#vidTitle').value = '';
-    } catch (err) { toast(err.message, 'err'); }
-    lbl.textContent = t;
+    const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+    const lbl = $('#vidFileLbl'), t = lbl.textContent, title = $('#vidTitle').value.trim();
+    let ok = 0;
+    for (let i = 0; i < files.length; i++) {
+      lbl.textContent = `جارٍ رفع ${i + 1} من ${files.length}… لا تغلق الصفحة`;
+      try {
+        const { url, path } = await Store.uploadFile(files[i], 'video');
+        const name = files.length > 1 ? files[i].name.replace(/\.[^.]+$/, '') : title;
+        S.videos = [...(S.videos || []), { id: Date.now().toString(36) + i, kind: 'file', url, path, title: name, visible: true }];
+        await Store.saveSettings(S); ok++;
+      } catch (err) { toast(`${files[i].name}: ${err.message}`, 'err'); }
+    }
+    renderVideos(); $('#vidTitle').value = ''; lbl.textContent = t;
+    if (ok) toast(`تم رفع ${ok} فيديو`, 'ok');
   });
   $('#vidRows').addEventListener('click', e => {
     const b = e.target.closest('[data-v]'); if (!b) return;

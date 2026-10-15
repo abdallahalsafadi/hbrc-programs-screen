@@ -18,6 +18,7 @@
     videos: [],
     videoSound: false,
     progRepeat: 1,
+    mixEvery: 2,
     labelCurrent: 'البرامج الحالية',
     labelUpcoming: 'البرامج القادمة',
     labelCompleted: 'البرامج المنتهية',

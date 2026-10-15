@@ -7,10 +7,10 @@
 <title>لوحة الإدارة</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css?v=5">
-<script src="config.js?v=5"></script>
+<link rel="stylesheet" href="style.css?v=6">
+<script src="config.js?v=6"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=5"></script>
+<script src="common.js?v=6"></script>
 </head>
 <body>
 
@@ -83,12 +83,14 @@
       <p class="hint">اختر ما يُعرض على الشاشة. الفيديو يُعرض بملء الشاشة وينتقل تلقائياً عند انتهائه.</p>
       <div class="field"><span class="label">وضع العرض</span><div id="vidMode" style="display:flex;gap:28px;flex-wrap:wrap"></div></div>
       <label class="check"><input type="checkbox" id="vidSound"> تشغيل الصوت (إن سمح المتصفح بذلك)</label>
-      <div class="field" style="max-width:420px;margin-top:8px"><label for="vidRepeat">عدد مرات عرض شرائح البرامج قبل الفيديو</label><input type="number" id="vidRepeat" min="1" max="10" inputmode="numeric"><small>يُستخدم في وضع «البرامج ثم الفيديو». مثال: 3 = تُعرض البرامج 3 مرات ثم الفيديو.</small></div>
+      <div class="field" id="repeatField" style="max-width:420px;margin-top:8px"><label for="vidRepeat">عدد مرات عرض شرائح البرامج قبل الفيديو</label><input type="number" id="vidRepeat" min="1" max="10" inputmode="numeric"><small>يُستخدم في وضع «البرامج ثم الفيديو». مثال: 3 = تُعرض البرامج 3 مرات ثم الفيديو.</small></div>
+      <div class="field" id="everyField" style="max-width:420px;margin-top:8px"><label for="vidEvery">عرض فيديو واحد بعد كل كم شريحة؟</label><input type="number" id="vidEvery" min="1" max="10" inputmode="numeric"><small>مثال: 2 = شريحتان ثم فيديو ثم شريحتان ثم الفيديو التالي… حسب ترتيب القائمة أدناه.</small></div>
       <div class="form-grid" style="margin:18px 0 24px">
         <div class="field full"><label for="vidTitle">عنوان الفيديو (اختياري)</label><input type="text" id="vidTitle"></div>
         <div class="field"><label for="ytUrl">رابط يوتيوب</label><div style="display:flex;gap:8px"><input type="url" id="ytUrl" dir="ltr" placeholder="https://youtu.be/..."><button type="button" class="btn primary" id="ytAdd">إضافة</button></div><small>يُفضّل للفيديوهات الطويلة. اجعله «غير مُدرج» إن لم تُرد نشره للعامة.</small></div>
-        <div class="field"><span class="label">أو رفع ملف فيديو</span><label class="btn" for="vidFile" id="vidFileLbl">اختر ملف MP4…</label><input type="file" id="vidFile" accept="video/mp4,video/webm" hidden><small id="vidUpHint"></small></div>
+        <div class="field"><span class="label">أو رفع ملف فيديو</span><label class="btn" for="vidFile" id="vidFileLbl">اختر ملف أو عدة ملفات MP4…</label><input type="file" id="vidFile" accept="video/mp4,video/webm" multiple hidden><small id="vidUpHint"></small></div>
       </div>
+      <p class="hint" style="margin:0 0 10px">ترتيب القائمة هو ترتيب العرض — استخدم الأسهم لتغييره.</p>
       <div class="rows" id="vidRows"></div>
     </section>
 
@@ -141,6 +143,6 @@
   </form>
 </dialog>
 
-<script src="admin.js?v=5"></script>
+<script src="admin.js?v=6"></script>
 </body>
 </html>

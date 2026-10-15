@@ -49,7 +49,15 @@
       const once = slides.slice();
       for (let r = 1; r < reps; r++) once.forEach(s => slides.push(s));
     }
-    if (mode !== 'programs') vids.forEach(v => slides.push({ type: 'video', v }));
+    if (mode === 'mix' && vids.length && slides.length) {
+      // فيديو واحد بعد كل X شرائح، بالتناوب حسب ترتيب القائمة
+      const every = Math.min(10, Math.max(1, parseInt(S.mixEvery, 10) || 2));
+      const prog = slides.slice(); slides = [];
+      let vi = 0, count = 0;
+      do {
+        prog.forEach(s => { slides.push(s); count++; if (count % every === 0 && vi < vids.length) slides.push({ type: 'video', v: vids[vi++] }); });
+      } while (vi < vids.length);
+    } else if (mode !== 'programs') vids.forEach(v => slides.push({ type: 'video', v }));
     pruneCache(vids);
 
     // الترويسة: شعار المؤسسة + شعار المركز (أو اسمه إن لم يُرفع شعار)
