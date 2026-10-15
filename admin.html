@@ -7,10 +7,10 @@
 <title>لوحة الإدارة</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css?v=10">
-<script src="config.js?v=10"></script>
+<link rel="stylesheet" href="style.css?v=11">
+<script src="config.js?v=11"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=10"></script>
+<script src="common.js?v=11"></script>
 </head>
 <body>
 
@@ -72,6 +72,7 @@
       <div class="toolbar">
         <button class="btn primary" id="addBtn"></button>
         <button class="btn" id="impProgBtn">استيراد من قسم آخر</button>
+        <button class="btn" id="linkProgBtn">رابط رفع (24 ساعة)</button>
         <div class="search"><input id="aq" type="search" placeholder="بحث…" aria-label="بحث في البرامج"><span id="aqIcon"></span></div>
         <div class="field" style="min-width:200px">
           <select id="af" aria-label="تصفية حسب الحالة">
@@ -96,9 +97,11 @@
       <div class="form-grid" style="margin:18px 0 24px">
         <div class="field full"><label for="vidTitle">عنوان الفيديو (اختياري)</label><input type="text" id="vidTitle"></div>
         <div class="field"><label for="ytUrl">رابط يوتيوب</label><div style="display:flex;gap:8px"><input type="url" id="ytUrl" dir="ltr" placeholder="https://youtu.be/..."><button type="button" class="btn primary" id="ytAdd">إضافة</button></div><small>يُفضّل للفيديوهات الطويلة. اجعله «غير مُدرج» إن لم تُرد نشره للعامة.</small></div>
-        <div class="field"><span class="label">أو رفع ملف فيديو</span><label class="btn" for="vidFile" id="vidFileLbl">اختر ملف أو عدة ملفات MP4…</label><input type="file" id="vidFile" accept="video/mp4,video/webm" multiple hidden><small id="vidUpHint"></small></div>
+        <div class="field"><span class="label">أو رفع ملف فيديو</span><label class="btn" for="vidFile" id="vidFileLbl">اختر ملف أو عدة ملفات MP4…</label><input type="file" id="vidFile" accept="video/mp4,.mp4" multiple hidden><small id="vidUpHint"></small></div>
       </div>
-      <div class="toolbar" style="margin-bottom:10px"><p class="hint" style="margin:0;flex:1">ترتيب القائمة هو ترتيب العرض — استخدم الأسهم لتغييره. زر «مشاركة» يسمح للأقسام الأخرى باستيراد الفيديو.</p><button type="button" class="btn" id="impVidBtn">استيراد فيديو من قسم آخر</button></div>
+      <div class="rules" id="vidRules"></div>
+      <div id="inboxBox"></div>
+      <div class="toolbar" style="margin-bottom:10px"><p class="hint" style="margin:0;flex:1">ترتيب القائمة هو ترتيب العرض — استخدم الأسهم لتغييره. زر «مشاركة» يسمح للأقسام الأخرى باستيراد الفيديو.</p><button type="button" class="btn" id="impVidBtn">استيراد فيديو من قسم آخر</button><button type="button" class="btn" id="linkVidBtn">رابط رفع (24 ساعة)</button></div>
       <div class="rows" id="vidRows"></div>
     </section>
 
@@ -152,6 +155,15 @@
 </div>
 
 <!-- محرر البرنامج -->
+<dialog id="linkDlg" aria-labelledby="lnkTitle">
+  <div class="editor-head"><h2 id="lnkTitle">روابط الرفع</h2><button type="button" class="dlg-close" style="position:static" data-lclose aria-label="إغلاق">×</button></div>
+  <div class="editor-body">
+    <p class="hint" id="lnkHint" style="margin-top:0"></p>
+    <button class="btn primary" type="button" id="lnkNew">إنشاء رابط جديد صالح لـ 24 ساعة</button>
+    <div class="rows" id="lnkRows" style="margin-top:18px"></div>
+  </div>
+</dialog>
+
 <dialog id="importDlg" aria-labelledby="impTitle">
   <div class="editor-head"><h2 id="impTitle">استيراد</h2><button type="button" class="dlg-close" style="position:static" data-iclose aria-label="إغلاق">×</button></div>
   <div class="editor-body" id="impBody"></div>
@@ -172,6 +184,6 @@
   </form>
 </dialog>
 
-<script src="admin.js?v=10"></script>
+<script src="admin.js?v=11"></script>
 </body>
 </html>

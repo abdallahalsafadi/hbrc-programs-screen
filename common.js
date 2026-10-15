@@ -51,6 +51,29 @@
     { id: 's6', title: 'المخيم الصيفي 2027', status: 'upcoming', featured: false, visible: true, sort_order: 6, owner: 'م. أحمد عمر', start_date: '2027-07-05', end_date: '2027-08-12' }
   ];
 
+  // قواعد رفع الفيديو
+  const VIDEO_RULES = { maxMB: 50, maxSec: 180, types: ['video/mp4'] };
+  const VIDEO_RULES_TEXT = ['الصيغة: MP4 فقط', 'الحجم: حتى 50 ميغابايت للملف', 'المدة: حتى 3 دقائق', 'الدقة المفضّلة: 1920×1080 أفقي (16:9)'];
+  function checkVideo(file) {
+    return new Promise((resolve, reject) => {
+      const isMp4 = VIDEO_RULES.types.includes(file.type) || /\.mp4$/i.test(file.name);
+      if (!isMp4) return reject(new Error(`«${file.name}»: الصيغة غير مقبولة — MP4 فقط`));
+      if (file.size > VIDEO_RULES.maxMB * 1024 * 1024) return reject(new Error(`«${file.name}»: الحجم ${(file.size / 1048576).toFixed(0)} ميغابايت — الحد الأقصى ${VIDEO_RULES.maxMB}`));
+      const v = document.createElement('video'), url = URL.createObjectURL(file);
+      let done = false;
+      const fin = (err, info) => { if (done) return; done = true; URL.revokeObjectURL(url); err ? reject(err) : resolve(info); };
+      v.preload = 'metadata';
+      v.onloadedmetadata = () => {
+        const d = v.duration;
+        if (isFinite(d) && d > VIDEO_RULES.maxSec) return fin(new Error(`«${file.name}»: المدة ${Math.floor(d / 60)}:${String(Math.round(d % 60)).padStart(2, '0')} — الحد الأقصى ${VIDEO_RULES.maxSec / 60} دقائق`));
+        fin(null, { duration: d, width: v.videoWidth, height: v.videoHeight, portrait: v.videoHeight > v.videoWidth });
+      };
+      v.onerror = () => fin(null, { duration: null });   // بعض المتصفحات لا تقرأ الملف — نكتفي بفحص الحجم والصيغة
+      setTimeout(() => fin(null, { duration: null }), 8000);
+      v.src = url;
+    });
+  }
+
   const K = { p: 'hbrc_programs', s: 'hbrc_settings', cred: 'hbrc_demo_cred', ses: 'hbrc_demo_session' };
   function lsGet(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { throw new Error('مساحة التخزين في المتصفح ممتلئة'); } }
@@ -58,7 +81,7 @@
   function ssSet(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) {} }
 
   const FIELDS = ['id', 'title', 'summary', 'description', 'category', 'status', 'start_date', 'end_date', 'schedule', 'location',
-    'audience', 'seats', 'registered', 'image_url', 'register_url', 'contact', 'featured', 'visible', 'sort_order', 'logo_url', 'owner', 'shared', 'source'];
+    'audience', 'seats', 'registered', 'image_url', 'register_url', 'contact', 'featured', 'visible', 'sort_order', 'logo_url', 'owner', 'shared', 'source', 'pending'];
   function clean(p) {
     const o = {};
     FIELDS.forEach(k => {
@@ -66,7 +89,7 @@
       if (v === undefined) return;
       if (typeof v === 'string') v = v.trim();
       if (k === 'seats' || k === 'registered' || k === 'sort_order') v = (v === '' || v == null || isNaN(+v)) ? null : parseInt(v, 10);
-      else if (k === 'featured' || k === 'visible' || k === 'shared') v = !!v;
+      else if (k === 'featured' || k === 'visible' || k === 'shared' || k === 'pending') v = !!v;
       else if (v === '') v = null;
       o[k] = v;
     });
@@ -143,6 +166,34 @@
       fail(error, 'تعذّر تحميل الشاشات');
       return data || [];
     },
+    // روابط الرفع المؤقتة (24 ساعة)
+    async createLink(kind) {
+      if (DEMO) throw new Error('روابط الرفع تعمل بعد ربط قاعدة البيانات');
+      const { data, error } = await sb.from('upload_links').insert({ screen: this.screen, kind }).select().single();
+      fail(error, 'تعذّر إنشاء الرابط');
+      return data;
+    },
+    async listLinks(kind) {
+      if (DEMO) return [];
+      const { data, error } = await sb.from('upload_links').select('*').eq('screen', this.screen).eq('kind', kind)
+        .gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false });
+      fail(error, 'تعذّر تحميل الروابط');
+      return data || [];
+    },
+    async deleteLink(token) {
+      const { error } = await sb.from('upload_links').delete().eq('token', token);
+      fail(error, 'تعذّر إلغاء الرابط');
+    },
+    async listInbox() {
+      if (DEMO) return [];
+      const { data, error } = await sb.from('inbox_videos').select('*').eq('screen', this.screen).order('created_at');
+      fail(error, 'تعذّر تحميل الفيديوهات الواردة');
+      return data || [];
+    },
+    async deleteInbox(id) {
+      const { error } = await sb.from('inbox_videos').delete().eq('id', id);
+      fail(error, 'تعذّر الحذف');
+    },
     async getSettings(screen) {
       const sc = screen || this.screen;
       if (DEMO) return { ...DEFAULT_SETTINGS, ...lsGet(sKey(sc), {}) };
@@ -201,7 +252,8 @@
     async uploadImage(file) { return this.uploadFile(file, 'image'); },
     async uploadFile(file, kind) {
       const isVid = kind === 'video';
-      if (isVid ? !file.type.startsWith('video/') : !file.type.startsWith('image/')) throw new Error(isVid ? 'الرجاء اختيار ملف فيديو (MP4)' : 'الرجاء اختيار ملف صورة');
+      if (isVid) await checkVideo(file);
+      else if (!file.type.startsWith('image/')) throw new Error('الرجاء اختيار ملف صورة');
       if (DEMO) {
         if (isVid) throw new Error('رفع الفيديو يعمل بعد ربط قاعدة البيانات. استخدم رابط يوتيوب في الوضع التجريبي');
         if (file.size > 1.5 * 1024 * 1024) throw new Error('في الوضع التجريبي الحد الأقصى للصورة 1.5 ميغابايت');
@@ -355,6 +407,6 @@
     close: I('<path d="M6 6l12 12M18 6L6 18"/>')
   };
 
-  window.App = { DEMO, Store, DEFAULT_SETTINGS, FONTS, SEED, applyTheme, esc, safeUrl, fmtDate, fmtRange, daysUntil, daysWord,
+  window.App = { DEMO, Store, VIDEO_RULES, VIDEO_RULES_TEXT, checkVideo, sb, DEFAULT_SETTINGS, FONTS, SEED, applyTheme, esc, safeUrl, fmtDate, fmtRange, daysUntil, daysWord,
     effectiveStatus, STATUS, toast, icons, lsGet, lsSet, byPublic, byOrder };
 })();

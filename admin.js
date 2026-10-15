@@ -1,6 +1,6 @@
 (async function () {
   'use strict';
-  const { Store, DEMO, DEFAULT_SETTINGS, FONTS, esc, safeUrl, fmtRange, STATUS, applyTheme, toast, icons } = App;
+  const { Store, DEMO, VIDEO_RULES_TEXT, DEFAULT_SETTINGS, FONTS, esc, safeUrl, fmtRange, STATUS, applyTheme, toast, icons } = App;
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   let S = { ...DEFAULT_SETTINGS }, P = [];
 
@@ -59,7 +59,7 @@
     try { SCREENS = await Store.listScreens(); } catch (e) { toast(e.message, 'err'); }
     if (!SCREENS.some(x => x.slug === Store.screen)) Store.screen = 'main';
     await switchScreen(Store.screen, true);
-    $('#vidUpHint').textContent = DEMO ? 'رفع الملفات يعمل بعد ربط قاعدة البيانات — استخدم يوتيوب في الوضع التجريبي.' : 'MP4 حتى 50 ميغابايت. يُحمَّل مرة واحدة ويُحفظ على جهاز التلفاز.';
+    $('#vidUpHint').textContent = DEMO ? 'رفع الملفات يعمل بعد ربط قاعدة البيانات — استخدم يوتيوب في الوضع التجريبي.' : 'MP4 فقط · حتى 50 ميغابايت · حتى 3 دقائق.';
   }
 
   /* ========== شاشات الأقسام ========== */
@@ -70,7 +70,7 @@
     try { localStorage.setItem('hbrc_admin_screen', slug); } catch (e) {}
     try { [S, P] = await Promise.all([Store.getSettings(), Store.listPrograms(true)]); } catch (e) { toast(e.message, 'err'); }
     applyTheme(S);
-    renderScreenBar(); renderRows(); renderContent(); renderLook(); renderVideos(); renderScreens();
+    renderScreenBar(); renderRows(); renderContent(); renderLook(); renderVideos(); renderScreens(); renderInbox();
     if (!first) toast('تعدّل الآن: ' + screenName(slug), 'ok');
   }
   function renderScreenBar() {
@@ -135,6 +135,73 @@
       await switchScreen(slug, true);
       toast('تم إنشاء الشاشة — يمكنك الآن إضافة برامجها', 'ok');
     });
+  });
+
+  /* ========== الفيديوهات الواردة عبر الروابط ========== */
+  let INBOX = [];
+  async function renderInbox() {
+    $('#vidRules').innerHTML = '<b>شروط رفع الفيديو</b><ul>' + VIDEO_RULES_TEXT.map(r => `<li>${esc(r)}</li>`).join('') + '</ul>';
+    try { INBOX = await Store.listInbox(); } catch (e) { INBOX = []; }
+    $('[data-tab=videos]').innerHTML = 'الفيديو' + (INBOX.length ? `<span class="cnt">${INBOX.length} جديد</span>` : '');
+    $('#inboxBox').innerHTML = INBOX.length ? `<div class="inbox"><h3>فيديوهات واردة بانتظار موافقتك (${INBOX.length})</h3><div class="rows">${INBOX.map((v, i) => `<div class="row pending" data-x="${i}">
+        <div class="thumb">${icons.video}</div>
+        <div><h3>${esc(v.title || (v.kind === 'youtube' ? 'فيديو يوتيوب' : 'فيديو مرفوع'))}</h3>
+          <div class="sub"><span class="badge ${v.kind === 'youtube' ? 'st-upcoming' : 'st-current'}">${v.kind === 'youtube' ? 'يوتيوب' : 'ملف مرفوع'}</span>${v.sender ? `<span>من: ${esc(v.sender)}</span>` : ''}<span>${new Date(v.created_at).toLocaleString('ar-AE')}</span></div></div>
+        <div class="row-actions">
+          <a class="btn sm" href="${esc(v.url)}" target="_blank" rel="noopener">${icons.eye} معاينة</a>
+          <button class="btn sm primary" data-ib="ok">اعتماد ✓</button>
+          <button class="btn sm danger" data-ib="no">رفض ✕</button>
+        </div></div>`).join('')}</div></div>` : '';
+  }
+  $('#inboxBox').addEventListener('click', e => {
+    const b = e.target.closest('[data-ib]'); if (!b) return;
+    const v = INBOX[+b.closest('.row').dataset.x];
+    if (b.dataset.ib === 'ok') return busy(null, async () => {
+      S.videos = [...(S.videos || []), { id: Date.now().toString(36), kind: v.kind, url: v.url, path: v.path || undefined, title: v.title || '', visible: true }];
+      await Store.saveSettings(S); await Store.deleteInbox(v.id);
+      renderVideos(); await renderInbox(); toast('تم اعتماد الفيديو — أُضيف إلى القائمة', 'ok');
+    });
+    if (!confirm('رفض هذا الفيديو وحذفه؟')) return;
+    busy(null, async () => { await Store.deleteInbox(v.id); if (v.path) await Store.deleteFile(v.path); await renderInbox(); toast('تم رفض الفيديو', 'ok'); });
+  });
+
+  /* ========== روابط الرفع (24 ساعة) ========== */
+  let lnkKind = 'video';
+  const lnkDlg = $('#linkDlg');
+  lnkDlg.addEventListener('click', e => { if (e.target.closest('[data-lclose]')) lnkDlg.close(); });
+  const uploadUrl = t => location.href.replace(/[?#].*$/, '').replace(/admin\.html$/, '') + 'upload.html?t=' + t;
+  function leftText(exp) {
+    const ms = new Date(exp) - Date.now(); if (ms <= 0) return 'منتهي';
+    const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000);
+    return h ? `متبقٍّ ${h} ساعة و${m} دقيقة` : `متبقٍّ ${m} دقيقة`;
+  }
+  async function renderLinks() {
+    $('#lnkRows').innerHTML = '<div class="empty">جارٍ التحميل…</div>';
+    try {
+      const L = await Store.listLinks(lnkKind);
+      $('#lnkRows').innerHTML = L.length ? L.map(l => `<div class="row" data-t="${esc(l.token)}" style="grid-template-columns:1fr auto">
+          <div><h3>${leftText(l.expires_at)}</h3><div class="lnk-url" dir="ltr">${esc(uploadUrl(l.token))}</div></div>
+          <div class="row-actions"><button class="btn sm primary" data-l="copy">${icons.copy} نسخ</button><button class="btn sm danger" data-l="del">إلغاء الرابط</button></div>
+        </div>`).join('') : '<div class="empty">لا توجد روابط نشطة.</div>';
+    } catch (e) { $('#lnkRows').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  }
+  function openLinks(kind) {
+    lnkKind = kind;
+    $('#lnkTitle').textContent = kind === 'video' ? 'روابط رفع الفيديو' : 'روابط إضافة البرامج';
+    $('#lnkHint').innerHTML = `أي شخص يفتح الرابط يستطيع ${kind === 'video' ? 'رفع فيديو' : 'إرسال برنامج'} إلى شاشة <b>${esc(screenName(Store.screen))}</b>. الرابط صالح 24 ساعة فقط، وكل ما يُرسل يبقى مخفياً حتى توافق عليه.`;
+    lnkDlg.showModal(); renderLinks();
+  }
+  $('#linkProgBtn').addEventListener('click', () => openLinks('program'));
+  $('#linkVidBtn').addEventListener('click', () => openLinks('video'));
+  $('#lnkNew').addEventListener('click', () => busy($('#lnkNew'), async () => {
+    const l = await Store.createLink(lnkKind); await renderLinks(); copyText(uploadUrl(l.token));
+  }));
+  $('#lnkRows').addEventListener('click', e => {
+    const b = e.target.closest('[data-l]'); if (!b) return;
+    const t = b.closest('.row').dataset.t;
+    if (b.dataset.l === 'copy') return copyText(uploadUrl(t));
+    if (!confirm('إلغاء هذا الرابط؟ لن يعمل بعد الآن.')) return;
+    busy(null, async () => { await Store.deleteLink(t); renderLinks(); toast('تم إلغاء الرابط', 'ok'); });
   });
 
   /* ========== الاستيراد من الأقسام الأخرى ========== */
@@ -209,6 +276,8 @@
   $('#aq').addEventListener('input', renderRows);
   $('#af').addEventListener('change', renderRows);
   function renderRows() {
+    const pc = P.filter(x => x.pending).length;
+    $('[data-tab=programs]').innerHTML = 'البرامج' + (pc ? `<span class="cnt">${pc} جديد</span>` : '');
     const q = $('#aq').value.trim(), f = $('#af').value;
     const list = P.filter(p => (!q || [p.title, p.owner].join(' ').includes(q)) &&
       (!f || (f === 'hidden' ? p.visible === false : p.status === f)));
@@ -217,10 +286,10 @@
     const filtered = !!(q || f);
     $('#rows').innerHTML = list.map(p => {
       const i = P.indexOf(p), img = safeUrl(p.image_url);
-      return `<div class="row ${p.visible === false ? 'hidden-prog' : ''}" data-id="${esc(p.id)}">
+      return `<div class="row ${p.pending ? 'pending' : (p.visible === false ? 'hidden-prog' : '')}" data-id="${esc(p.id)}">
         ${img ? `<img class="thumb" src="${esc(img)}" alt="">` : `<div class="thumb">${esc((p.title || '؟').charAt(0))}</div>`}
         <div>
-          <h3>${esc(p.title)} ${p.featured ? `<span class="tag" style="vertical-align:middle">${icons.star} مميز</span>` : ''} ${p.shared ? `<span class="tag share" style="vertical-align:middle">${icons.share} مشترك</span>` : ''} ${p.source ? `<span class="tag" style="vertical-align:middle">${icons.download} من ${esc(screenName(p.source))}</span>` : ''}</h3>
+          <h3>${esc(p.title)} ${p.featured ? `<span class="tag" style="vertical-align:middle">${icons.star} مميز</span>` : ''} ${p.shared ? `<span class="tag share" style="vertical-align:middle">${icons.share} مشترك</span>` : ''} ${p.source ? `<span class="tag" style="vertical-align:middle">${icons.download} من ${esc(screenName(p.source))}</span>` : ''} ${p.pending ? '<span class="tag pend" style="vertical-align:middle">جديد — بانتظار موافقتك</span>' : ''}</h3>
           <div class="sub"><span class="badge st-${p.status}">${STATUS[p.status] || ''}</span>
             ${p.owner ? `<span>${icons.user} ${esc(p.owner)}</span>` : ''}
             ${p.start_date || p.end_date ? `<span>${esc(fmtRange(p.start_date, p.end_date, S.dateLocale))}</span>` : ''}
@@ -232,7 +301,8 @@
           <button class="btn sm" data-act="vis" title="${p.visible === false ? 'إظهار' : 'إخفاء'}" aria-label="${p.visible === false ? 'إظهار' : 'إخفاء'}">${p.visible === false ? icons.eyeOff : icons.eye}</button>
           <button class="btn sm" data-act="dup" title="نسخ" aria-label="نسخ">${icons.copy}</button>
           <button class="btn sm" data-act="edit">${icons.edit} تعديل</button>
-          <button class="btn sm danger" data-act="del" title="حذف" aria-label="حذف">${icons.trash}</button>
+          ${p.pending ? '<button class="btn sm primary" data-act="approve">اعتماد ✓</button>' : ''}
+          <button class="btn sm danger" data-act="del" title="${p.pending ? 'رفض وحذف' : 'حذف'}" aria-label="حذف">${icons.trash}</button>
         </div>
       </div>`;
     }).join('');
@@ -241,6 +311,7 @@
     const b = e.target.closest('[data-act]'); if (!b) return;
     const id = b.closest('.row').dataset.id, p = P.find(x => String(x.id) === id), i = P.indexOf(p);
     const act = b.dataset.act;
+    if (act === 'approve') return busy(null, async () => { Object.assign(p, await Store.saveProgram({ ...p, pending: false, visible: true })); renderRows(); toast('تم اعتماد البرنامج — سيظهر على الشاشة', 'ok'); });
     if (act === 'edit') return openEditor(p);
     if (act === 'dup') return openEditor({ ...p, id: undefined, title: p.title + ' (نسخة)', visible: false, shared: false, source: null });
     if (act === 'del') {
