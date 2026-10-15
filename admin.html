@@ -7,10 +7,10 @@
 <title>لوحة الإدارة</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css?v=8">
-<script src="config.js?v=8"></script>
+<link rel="stylesheet" href="style.css?v=9">
+<script src="config.js?v=9"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=8"></script>
+<script src="common.js?v=9"></script>
 </head>
 <body>
 
@@ -71,6 +71,7 @@
       <p class="hint">الترتيب هنا هو ترتيب الظهور على الشاشة. التغييرات تظهر على التلفاز خلال دقيقة.</p>
       <div class="toolbar">
         <button class="btn primary" id="addBtn"></button>
+        <button class="btn" id="impProgBtn">استيراد من قسم آخر</button>
         <div class="search"><input id="aq" type="search" placeholder="بحث…" aria-label="بحث في البرامج"><span id="aqIcon"></span></div>
         <div class="field" style="min-width:200px">
           <select id="af" aria-label="تصفية حسب الحالة">
@@ -97,7 +98,7 @@
         <div class="field"><label for="ytUrl">رابط يوتيوب</label><div style="display:flex;gap:8px"><input type="url" id="ytUrl" dir="ltr" placeholder="https://youtu.be/..."><button type="button" class="btn primary" id="ytAdd">إضافة</button></div><small>يُفضّل للفيديوهات الطويلة. اجعله «غير مُدرج» إن لم تُرد نشره للعامة.</small></div>
         <div class="field"><span class="label">أو رفع ملف فيديو</span><label class="btn" for="vidFile" id="vidFileLbl">اختر ملف أو عدة ملفات MP4…</label><input type="file" id="vidFile" accept="video/mp4,video/webm" multiple hidden><small id="vidUpHint"></small></div>
       </div>
-      <p class="hint" style="margin:0 0 10px">ترتيب القائمة هو ترتيب العرض — استخدم الأسهم لتغييره.</p>
+      <div class="toolbar" style="margin-bottom:10px"><p class="hint" style="margin:0;flex:1">ترتيب القائمة هو ترتيب العرض — استخدم الأسهم لتغييره. زر «مشاركة» يسمح للأقسام الأخرى باستيراد الفيديو.</p><button type="button" class="btn" id="impVidBtn">استيراد فيديو من قسم آخر</button></div>
       <div class="rows" id="vidRows"></div>
     </section>
 
@@ -151,6 +152,15 @@
 </div>
 
 <!-- محرر البرنامج -->
+<dialog id="importDlg" aria-labelledby="impTitle">
+  <div class="editor-head"><h2 id="impTitle">استيراد</h2><button type="button" class="dlg-close" style="position:static" data-iclose aria-label="إغلاق">×</button></div>
+  <div class="editor-body" id="impBody"></div>
+  <div class="editor-foot">
+    <button class="btn primary" type="button" id="impGo">استيراد المحدد</button>
+    <button class="btn" type="button" data-iclose>إلغاء</button>
+  </div>
+</dialog>
+
 <dialog id="editor" aria-labelledby="edTitle">
   <form id="progForm" method="dialog" novalidate>
     <div class="editor-head"><h2 id="edTitle">برنامج</h2><button type="button" class="dlg-close" style="position:static" data-close aria-label="إغلاق"></button></div>
@@ -162,6 +172,6 @@
   </form>
 </dialog>
 
-<script src="admin.js?v=8"></script>
+<script src="admin.js?v=9"></script>
 </body>
 </html>

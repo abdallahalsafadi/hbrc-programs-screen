@@ -136,6 +136,68 @@
     });
   });
 
+  /* ========== الاستيراد من الأقسام الأخرى ========== */
+  let impMode = null, impItems = [];
+  const impDlg = $('#importDlg');
+  impDlg.addEventListener('click', e => { if (e.target.closest('[data-iclose]')) impDlg.close(); });
+  function groupHTML(groups, render) {
+    const keys = Object.keys(groups);
+    if (!keys.length) return '<div class="empty">لا توجد عناصر مشتركة من أقسام أخرى بعد.<br><small>اطلب من القسم الآخر تفعيل خيار «المشاركة» على البرنامج أو الفيديو.</small></div>';
+    return keys.map(k => `<div class="imp-group"><h3>${esc(screenName(k))}</h3>${groups[k].map(render).join('')}</div>`).join('');
+  }
+  async function openImport(mode) {
+    impMode = mode; impItems = [];
+    $('#impTitle').textContent = mode === 'prog' ? 'استيراد برامج من قسم آخر' : 'استيراد فيديو من قسم آخر';
+    $('#impBody').innerHTML = '<div class="empty">جارٍ التحميل…</div>';
+    impDlg.showModal();
+    try {
+      const groups = {};
+      if (mode === 'prog') {
+        const list = await Store.listSharedPrograms();
+        list.forEach(p => {
+          const done = P.some(x => x.source === p.screen && x.title === p.title);
+          impItems.push({ src: p.screen, item: p, done });
+          (groups[p.screen] = groups[p.screen] || []).push(impItems.length - 1);
+        });
+        $('#impBody').innerHTML = groupHTML(groups, i => { const o = impItems[i], p = o.item;
+          return `<label class="imp-item ${o.done ? 'done' : ''}"><input type="checkbox" data-ii="${i}" ${o.done ? 'disabled' : ''}>
+            <div><div class="t">${esc(p.title)}</div><div class="m">${esc(STATUS[p.status] || '')}${p.owner ? ' · ' + esc(p.owner) : ''}${p.start_date || p.end_date ? ' · ' + esc(fmtRange(p.start_date, p.end_date, S.dateLocale)) : ''}${o.done ? ' · مستورد مسبقاً' : ''}</div></div></label>`; });
+      } else {
+        const all = await Store.allScreensData();
+        all.filter(x => x.slug !== Store.screen).forEach(x => ((x.data && x.data.videos) || []).filter(v => v.shared).forEach(v => {
+          const done = (S.videos || []).some(o => o.url === v.url);
+          impItems.push({ src: x.slug, item: v, done });
+          (groups[x.slug] = groups[x.slug] || []).push(impItems.length - 1);
+        }));
+        $('#impBody').innerHTML = groupHTML(groups, i => { const o = impItems[i], v = o.item;
+          return `<label class="imp-item ${o.done ? 'done' : ''}"><input type="checkbox" data-ii="${i}" ${o.done ? 'disabled' : ''}>
+            <div><div class="t">${esc(v.title || (v.kind === 'youtube' ? 'فيديو يوتيوب' : 'فيديو مرفوع'))}</div><div class="m">${v.kind === 'youtube' ? 'يوتيوب' : 'ملف مرفوع'}${o.done ? ' · موجود مسبقاً' : ''}</div></div></label>`; });
+      }
+    } catch (e) { $('#impBody').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  }
+  $('#impProgBtn').addEventListener('click', () => openImport('prog'));
+  $('#impVidBtn').addEventListener('click', () => openImport('vid'));
+  $('#impGo').addEventListener('click', () => {
+    const picked = [...$('#impBody').querySelectorAll('input[data-ii]:checked')].map(c => impItems[+c.dataset.ii]);
+    if (!picked.length) return toast('اختر عنصراً واحداً على الأقل', 'err');
+    busy($('#impGo'), async () => {
+      if (impMode === 'prog') {
+        let order = P.reduce((m, x) => Math.max(m, x.sort_order || 0), 0);
+        for (const o of picked) {
+          const src = o.item;
+          const row = { ...src, id: undefined, screen: Store.screen, shared: false, source: o.src, featured: false, visible: true, sort_order: ++order };
+          P.push(await Store.saveProgram(row));
+        }
+        renderRows();
+      } else {
+        picked.forEach((o, k) => { S.videos = [...(S.videos || []), { ...o.item, id: Date.now().toString(36) + k, shared: false, source: o.src, visible: true }]; });
+        await Store.saveSettings(S); renderVideos();
+      }
+      impDlg.close();
+      toast(`تم استيراد ${picked.length} ${impMode === 'prog' ? 'برنامج' : 'فيديو'}`, 'ok');
+    });
+  });
+
   /* ========== التبويبات ========== */
   $$('.tab').forEach(t => t.addEventListener('click', () => {
     $$('.tab').forEach(x => x.setAttribute('aria-selected', x === t));
@@ -157,7 +219,7 @@
       return `<div class="row ${p.visible === false ? 'hidden-prog' : ''}" data-id="${esc(p.id)}">
         ${img ? `<img class="thumb" src="${esc(img)}" alt="">` : `<div class="thumb">${esc((p.title || '؟').charAt(0))}</div>`}
         <div>
-          <h3>${esc(p.title)} ${p.featured ? `<span class="tag" style="vertical-align:middle">${icons.star} مميز</span>` : ''}</h3>
+          <h3>${esc(p.title)} ${p.featured ? `<span class="tag" style="vertical-align:middle">${icons.star} مميز</span>` : ''} ${p.shared ? `<span class="tag share" style="vertical-align:middle">${icons.share} مشترك</span>` : ''} ${p.source ? `<span class="tag" style="vertical-align:middle">${icons.download} من ${esc(screenName(p.source))}</span>` : ''}</h3>
           <div class="sub"><span class="badge st-${p.status}">${STATUS[p.status] || ''}</span>
             ${p.owner ? `<span>${icons.user} ${esc(p.owner)}</span>` : ''}
             ${p.start_date || p.end_date ? `<span>${esc(fmtRange(p.start_date, p.end_date, S.dateLocale))}</span>` : ''}
@@ -179,7 +241,7 @@
     const id = b.closest('.row').dataset.id, p = P.find(x => String(x.id) === id), i = P.indexOf(p);
     const act = b.dataset.act;
     if (act === 'edit') return openEditor(p);
-    if (act === 'dup') return openEditor({ ...p, id: undefined, title: p.title + ' (نسخة)', visible: false });
+    if (act === 'dup') return openEditor({ ...p, id: undefined, title: p.title + ' (نسخة)', visible: false, shared: false, source: null });
     if (act === 'del') {
       if (!confirm(`حذف «${p.title}» نهائياً؟ لا يمكن التراجع.`)) return;
       return busy(null, async () => { await Store.deleteProgram(p.id); P.splice(i, 1); renderRows(); toast('تم الحذف', 'ok'); });
@@ -208,7 +270,8 @@
     { k: 'logo_url', l: 'شعار البرنامج (اختياري)', t: 'image', full: true, h: 'يظهر بجانب اسم البرنامج — يُفضّل PNG بخلفية شفافة' },
     { k: 'image_url', l: 'صورة البرنامج (اختياري)', t: 'image', full: true },
     { k: 'featured', l: 'يظهر أولاً', t: 'check' },
-    { k: 'visible', l: 'ظاهر على الشاشة', t: 'check' }
+    { k: 'visible', l: 'ظاهر على الشاشة', t: 'check' },
+    { k: 'shared', l: 'السماح للأقسام الأخرى باستيراد هذا البرنامج', t: 'check', full: true }
   ];
   let editing = null;
   function fieldHTML(f, v, prefix) {
@@ -396,11 +459,12 @@
     $('#vidRows').innerHTML = V.length ? V.map((v, i) => `<div class="row ${v.visible === false ? 'hidden-prog' : ''}" data-i="${i}">
         <div class="thumb" style="font-size:1.2rem">${i + 1}</div>
         <div><h3>${esc(v.title || (v.kind === 'youtube' ? 'فيديو يوتيوب' : 'فيديو مرفوع'))}</h3>
-          <div class="sub"><span class="badge ${v.kind === 'youtube' ? 'st-upcoming' : 'st-current'}">${v.kind === 'youtube' ? 'يوتيوب' : 'ملف مرفوع'}</span>${v.visible === false ? '<b>مخفي</b>' : ''}</div></div>
+          <div class="sub"><span class="badge ${v.kind === 'youtube' ? 'st-upcoming' : 'st-current'}">${v.kind === 'youtube' ? 'يوتيوب' : 'ملف مرفوع'}</span>${v.visible === false ? '<b>مخفي</b>' : ''}${v.shared ? `<span class="tag share">${icons.share} مشترك</span>` : ''}${v.source ? `<span class="tag">${icons.download} من ${esc(screenName(v.source))}</span>` : ''}</div></div>
         <div class="row-actions">
           <button class="btn sm" data-v="up" aria-label="لأعلى" ${i === 0 ? 'disabled' : ''}>${icons.up}</button>
           <button class="btn sm" data-v="down" aria-label="لأسفل" ${i === V.length - 1 ? 'disabled' : ''}>${icons.down}</button>
           <button class="btn sm" data-v="vis" aria-label="إظهار/إخفاء">${v.visible === false ? icons.eyeOff : icons.eye}</button>
+          <button class="btn sm" data-v="share" title="مشاركة مع الأقسام">${icons.share} ${v.shared ? 'إلغاء المشاركة' : 'مشاركة'}</button>
           <button class="btn sm" data-v="ren">${icons.edit} عنوان</button>
           <button class="btn sm danger" data-v="del" aria-label="حذف">${icons.trash}</button>
         </div></div>`).join('') : '<div class="empty">لا توجد فيديوهات بعد.</div>';
@@ -438,11 +502,18 @@
     const a = b.dataset.v;
     if (a === 'up' || a === 'down') { const j = a === 'up' ? i - 1 : i + 1; [V[i], V[j]] = [V[j], V[i]]; return busy(null, () => saveVideos()); }
     if (a === 'vis') { v.visible = v.visible === false; return busy(null, () => saveVideos()); }
+    if (a === 'share') { v.shared = !v.shared; return busy(null, () => saveVideos(v.shared ? 'أصبح الفيديو متاحاً للأقسام الأخرى' : 'تم إلغاء المشاركة')); }
     if (a === 'ren') { const t = prompt('عنوان الفيديو (اختياري — يظهر أسفل الشاشة):', v.title || ''); if (t === null) return; v.title = t.trim(); return busy(null, () => saveVideos('تم الحفظ')); }
     if (a === 'del') {
       if (!confirm('حذف هذا الفيديو؟')) return;
       V.splice(i, 1);
-      return busy(null, async () => { await saveVideos('تم الحذف'); if (v.path) await Store.deleteFile(v.path); });
+      return busy(null, async () => {
+        await saveVideos('تم الحذف');
+        if (!v.path) return;
+        const all = await Store.allScreensData().catch(() => null);
+        const used = !all || all.some(x => ((x.data && x.data.videos) || []).some(o => o.path === v.path));
+        if (!used) await Store.deleteFile(v.path);   // الملف يُحذف فقط إن لم يستخدمه قسم آخر
+      });
     }
   });
 

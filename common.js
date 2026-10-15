@@ -58,7 +58,7 @@
   function ssSet(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) {} }
 
   const FIELDS = ['id', 'title', 'summary', 'description', 'category', 'status', 'start_date', 'end_date', 'schedule', 'location',
-    'audience', 'seats', 'registered', 'image_url', 'register_url', 'contact', 'featured', 'visible', 'sort_order', 'logo_url', 'owner'];
+    'audience', 'seats', 'registered', 'image_url', 'register_url', 'contact', 'featured', 'visible', 'sort_order', 'logo_url', 'owner', 'shared', 'source'];
   function clean(p) {
     const o = {};
     FIELDS.forEach(k => {
@@ -66,7 +66,7 @@
       if (v === undefined) return;
       if (typeof v === 'string') v = v.trim();
       if (k === 'seats' || k === 'registered' || k === 'sort_order') v = (v === '' || v == null || isNaN(+v)) ? null : parseInt(v, 10);
-      else if (k === 'featured' || k === 'visible') v = !!v;
+      else if (k === 'featured' || k === 'visible' || k === 'shared') v = !!v;
       else if (v === '') v = null;
       o[k] = v;
     });
@@ -128,6 +128,20 @@
       const { data, error } = await sb.from('screens').select('slug').eq('slug', slug).maybeSingle();
       fail(error, 'تعذّر تحميل الشاشة');
       return !!data;
+    },
+    // البرامج التي سمحت أقسام أخرى بمشاركتها
+    async listSharedPrograms() {
+      if (DEMO) return lsGet(K.p, []).filter(r => r.shared && (r.screen || 'main') !== this.screen);
+      const { data, error } = await sb.from('programs').select('*').eq('shared', true).neq('screen', this.screen).order('sort_order');
+      fail(error, 'تعذّر تحميل البرامج المشتركة');
+      return data || [];
+    },
+    // بيانات كل الشاشات (للفيديوهات المشتركة)
+    async allScreensData() {
+      if (DEMO) return demoScreens().map(x => ({ slug: x.slug, name: x.name, data: lsGet(sKey(x.slug), {}) }));
+      const { data, error } = await sb.from('screens').select('slug,name,data');
+      fail(error, 'تعذّر تحميل الشاشات');
+      return data || [];
     },
     async getSettings(screen) {
       const sc = screen || this.screen;
@@ -321,6 +335,8 @@
     users: I('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/>'),
     user: I('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
     video: I('<rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l6-3v10l-6-3"/>'),
+    share: I('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>'),
+    download: I('<path d="M12 4v12M6 10l6 6 6-6M4 20h16"/>'),
     clock: I('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
     link: I('<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
     search: I('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'),
