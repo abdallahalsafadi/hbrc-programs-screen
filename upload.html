@@ -7,10 +7,10 @@
 <title>رفع محتوى</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css?v=15">
-<script src="config.js?v=15"></script>
+<link rel="stylesheet" href="style.css?v=17">
+<script src="config.js?v=17"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=15"></script>
+<script src="common.js?v=17"></script>
 <style>
   .up-wrap{max-width:760px;margin:0 auto;padding:0 16px 48px}
   .up-head{display:flex;align-items:center;justify-content:center;gap:22px;padding:22px 0;flex-wrap:wrap}
@@ -60,7 +60,7 @@
   if (error || !info) return dead('انتهت صلاحية هذا الرابط أو أنه غير صالح');
 
   const exp = new Date(info.expires_at);
-  const left = () => { const ms = exp - Date.now(); if (ms <= 0) return 'انتهت صلاحية الرابط'; const h = Math.floor(ms / 36e5), m = Math.floor(ms % 36e5 / 6e4); return `الرابط صالح لمدة ${h ? h + ' ساعة و' : ''}${m} دقيقة`; };
+  const left = () => { const ms = exp - Date.now(); if (ms <= 0) return 'انتهت صلاحية الرابط'; const d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4); return 'الرابط صالح لمدة ' + (d ? `${d} يوم و${h} ساعة` : h ? `${h} ساعة و${m} دقيقة` : `${m} دقيقة`); };
   const rnd = () => Date.now() + '-' + Math.random().toString(36).slice(2, 8);
   const say = (m, cls) => { $('#st').innerHTML = `<span class="${cls || ''}">${m}</span>`; };
   const ERR = { link_expired: 'انتهت صلاحية الرابط', title_required: 'اسم البرنامج مطلوب', bad_url: 'رابط يوتيوب غير صحيح', bad_file: 'تعذّر التحقق من الملف' };

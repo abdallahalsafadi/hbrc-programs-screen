@@ -173,8 +173,10 @@
   const uploadUrl = t => siteBase() + 'upload.html?t=' + t;
   function leftText(exp) {
     const ms = new Date(exp) - Date.now(); if (ms <= 0) return 'منتهي';
-    const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000);
-    return h ? `متبقٍّ ${h} ساعة و${m} دقيقة` : `متبقٍّ ${m} دقيقة`;
+    const d = Math.floor(ms / 864e5), h = Math.floor(ms % 864e5 / 36e5), m = Math.floor(ms % 36e5 / 6e4);
+    const until = new Date(exp).toLocaleString('ar-AE', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+    const left = d ? `${d} يوم و${h} ساعة` : h ? `${h} ساعة و${m} دقيقة` : `${m} دقيقة`;
+    return `متبقٍّ ${left} — ينتهي ${until}`;
   }
   async function renderLinks() {
     $('#lnkRows').innerHTML = '<div class="empty">جارٍ التحميل…</div>';
@@ -189,13 +191,13 @@
   function openLinks(kind) {
     lnkKind = kind;
     $('#lnkTitle').textContent = kind === 'video' ? 'روابط رفع الفيديو' : 'روابط إضافة البرامج';
-    $('#lnkHint').innerHTML = `أي شخص يفتح الرابط يستطيع ${kind === 'video' ? 'رفع فيديو' : 'إرسال برنامج'} إلى شاشة <b>${esc(screenName(Store.screen))}</b>. الرابط صالح 24 ساعة فقط، وكل ما يُرسل يبقى مخفياً حتى توافق عليه.`;
+    $('#lnkHint').innerHTML = `أي شخص يفتح الرابط يستطيع ${kind === 'video' ? 'رفع فيديو' : 'إرسال برنامج'} إلى شاشة <b>${esc(screenName(Store.screen))}</b>. اختر مدة صلاحية الرابط قبل إنشائه — بعد انتهائها يتوقف الرابط تلقائياً. كل ما يُرسل يبقى مخفياً حتى توافق عليه.`;
     lnkDlg.showModal(); renderLinks();
   }
   $('#linkProgBtn').addEventListener('click', () => openLinks('program'));
   $('#linkVidBtn').addEventListener('click', () => openLinks('video'));
   $('#lnkNew').addEventListener('click', () => busy($('#lnkNew'), async () => {
-    const l = await Store.createLink(lnkKind); await renderLinks(); copyText(uploadUrl(l.token));
+    const l = await Store.createLink(lnkKind, $('#lnkDur').value); await renderLinks(); copyText(uploadUrl(l.token));
   }));
   $('#lnkRows').addEventListener('click', e => {
     const b = e.target.closest('[data-l]'); if (!b) return;

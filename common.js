@@ -204,9 +204,11 @@
       return data || [];
     },
     // روابط الرفع المؤقتة (24 ساعة)
-    async createLink(kind) {
+    async createLink(kind, hours) {
       if (DEMO) throw new Error('روابط الرفع تعمل بعد ربط قاعدة البيانات');
-      const { data, error } = await sb.from('upload_links').insert({ screen: this.screen, kind }).select().single();
+      const h = Math.min(24 * 30, Math.max(0.25, Number(hours) || 24));
+      const expires_at = new Date(Date.now() + h * 3600 * 1000).toISOString();
+      const { data, error } = await sb.from('upload_links').insert({ screen: this.screen, kind, expires_at }).select().single();
       fail(error, 'تعذّر إنشاء الرابط');
       return data;
     },
