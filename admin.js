@@ -28,8 +28,9 @@
     $('#appView').hidden = true;
     $('#loginView').hidden = false;
     $('#loginLogo').outerHTML = logoHTML(S);
-    $('#loginSub').textContent = S.siteTitle;
-    if (DEMO) $('#loginSub').innerHTML = esc(S.siteTitle) + '<br><b>وضع تجريبي:</b> <span dir="ltr">admin / admin123</span>';
+    const org = 'مؤسسة حمدان بن راشد آل مكتوم للعلوم الطبية والتربوية';
+    $('#loginSub').textContent = org;
+    if (DEMO) $('#loginSub').innerHTML = esc(org) + '<br><b>وضع تجريبي:</b> <span dir="ltr">admin / admin123</span>';
     $('#lu').focus();
   }
   $('#loginForm').addEventListener('submit', async e => {
