@@ -63,7 +63,8 @@
   }
 
   /* ========== شاشات الأقسام ========== */
-  const screenUrl = slug => { const base = location.href.replace(/[?#].*$/, '').replace(/admin\.html$/, ''); return base + (slug === 'main' ? '' : '?s=' + slug); };
+  const siteBase = () => new URL('./', location.href).href;
+  const screenUrl = slug => siteBase() + (slug === 'main' ? '' : '?s=' + slug);
   const screenName = slug => (SCREENS.find(x => x.slug === slug) || {}).name || slug;
   async function switchScreen(slug, first) {
     Store.screen = slug;
@@ -169,7 +170,7 @@
   let lnkKind = 'video';
   const lnkDlg = $('#linkDlg');
   lnkDlg.addEventListener('click', e => { if (e.target.closest('[data-lclose]')) lnkDlg.close(); });
-  const uploadUrl = t => location.href.replace(/[?#].*$/, '').replace(/admin\.html$/, '') + 'upload.html?t=' + t;
+  const uploadUrl = t => siteBase() + 'upload.html?t=' + t;
   function leftText(exp) {
     const ms = new Date(exp) - Date.now(); if (ms <= 0) return 'منتهي';
     const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000);
