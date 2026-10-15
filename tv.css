@@ -56,7 +56,7 @@ body.idle{cursor:none}
 .dots span.on{width:4.4rem;background:var(--primary)}
 .timer{flex:1;height:.6rem;background:color-mix(in srgb,var(--text) 8%,#fff);border-radius:1rem;overflow:hidden}
 .timer i{display:block;height:100%;width:0;background:var(--accent);border-radius:1rem}
-.hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(13,16,16,.75);color:#fff;padding:.8rem 2rem;border-radius:99rem;font-size:1.4rem;transition:opacity .6s}
+.hint{position:fixed;z-index:30;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(13,16,16,.75);color:#fff;padding:.8rem 2rem;border-radius:99rem;font-size:1.4rem;transition:opacity .6s}
 .hint.gone{opacity:0}
 .loading{display:grid;place-items:center;font-size:3rem;opacity:.7}
 

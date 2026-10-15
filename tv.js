@@ -130,6 +130,10 @@
     });
     return ytReady;
   }
+  function showSoundHint() {
+    const h = $('#hint'); h.textContent = 'اضغط على الشاشة أو زر OK لتشغيل الصوت'; h.classList.remove('gone');
+    setTimeout(() => h.classList.add('gone'), 8000);
+  }
   function stopVideo() {
     clearTimeout(timer);
     if (player) { try { player.destroy ? player.destroy() : (player.pause(), player.remove()); } catch (e) {} player = null; }
@@ -154,7 +158,7 @@
         playerVars: { autoplay: 1, mute: sound ? 0 : 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, disablekb: 1 },
         events: {
           onReady: e => { sound ? e.target.unMute() : e.target.mute(); e.target.playVideo();
-            setTimeout(() => { try { if (player && player.getPlayerState && player.getPlayerState() !== 1) { player.mute(); player.playVideo(); } } catch (x) {} }, 4000); },
+            setTimeout(() => { try { if (player && player.getPlayerState && player.getPlayerState() !== 1) { player.mute(); player.playVideo(); if (sound) showSoundHint(); } } catch (x) {} }, 4000); },
           onStateChange: e => { if (e.data === 0) ended(); },
           onError: () => setTimeout(go, 2000)
         }
@@ -167,7 +171,7 @@
       box.appendChild(vid);
       player = vid;
       vid.src = await cachedSrc(v.url);
-      vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); });
+      vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); if (sound) showSoundHint(); });
     }
   }
 
@@ -206,10 +210,18 @@
   }
 
   /* ---------- وضع الشاشة ---------- */
+  // أي ضغطة (فأرة أو زر OK في الريموت) تسمح للمتصفح بتشغيل الصوت
+  function unmute() {
+    if (!S || !S.videoSound || !player) return;
+    try { if (player.unMute) { player.unMute(); player.setVolume && player.setVolume(100); player.playVideo(); } else { player.muted = false; player.play(); } } catch (e) {}
+    $('#hint').classList.add('gone');
+  }
   document.addEventListener('click', () => {
     const el = document.documentElement;
     if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => {});
+    unmute();
   });
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'OK' || e.keyCode === 13) unmute(); });
   document.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft') next();
     else if (e.key === 'ArrowRight') show(idx - 1);
