@@ -92,7 +92,8 @@
     const logo = safeUrl(S.logoUrl), cl = safeUrl(S.centreLogoUrl);
     return `<section class="slide video"><div class="vbox"></div>
       ${logo || cl ? `<div class="wm">${logo ? `<img src="${esc(logo)}" alt="">` : ''}${cl ? `<img src="${esc(cl)}" alt="">` : ''}</div>` : ''}
-      ${s.v.title ? `<div class="vtitle">${esc(s.v.title)}</div>` : ''}</section>`;
+      ${s.v.title ? `<div class="vtitle">${esc(s.v.title)}</div>` : ''}
+      <button type="button" class="vskip" aria-label="تخطّي الفيديو">تخطّي <span aria-hidden="true">⏭</span></button></section>`;
   }
 
   function tile(p, key) {
@@ -251,7 +252,17 @@
     else if (e.key === ' ') { paused = !paused; show(idx); }
   });
   let idleT;
-  document.addEventListener('mousemove', () => { document.body.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => document.body.classList.add('idle'), 3000); });
+  // زر التخطّي: باهت دائماً، ويتّضح لثوانٍ عند تحريك الفأرة أو لمس الشاشة أو الضغط على الريموت
+  let awakeT;
+  const wakeUi = () => { document.body.classList.add('awake'); clearTimeout(awakeT); awakeT = setTimeout(() => document.body.classList.remove('awake'), 3000); };
+  document.addEventListener('mousemove', () => { document.body.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => document.body.classList.add('idle'), 3000); wakeUi(); });
+  document.addEventListener('touchstart', wakeUi, { passive: true });
+  document.addEventListener('keydown', wakeUi);
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.vskip')) return;
+    e.stopPropagation(); e.preventDefault();
+    next();
+  }, true);
   setTimeout(() => $('#hint').classList.add('gone'), 6000);
   async function wake() { try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {} }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });

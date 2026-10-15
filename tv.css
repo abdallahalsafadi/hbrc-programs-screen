@@ -75,3 +75,10 @@ body.idle{cursor:none}
 .slide.video .wm{position:absolute;top:2.4rem;inset-inline-end:2.4rem;background:rgba(255,255,255,.92);border-radius:1.2rem;padding:.8rem 1.2rem;z-index:2;display:flex;gap:1.2rem;align-items:center}
 .slide.video .wm img{height:4.2rem;width:auto}
 .slide.video .vtitle{position:absolute;bottom:2.4rem;inset-inline-start:2.4rem;z-index:2;background:rgba(13,16,16,.65);color:#fff;font-size:2.2rem;font-weight:700;padding:.6rem 1.6rem;border-radius:1rem}
+
+/* زر تخطّي الفيديو — صغير وشفاف مثل يوتيوب */
+.slide.video .vskip{position:absolute;bottom:2.4rem;left:2.4rem;z-index:3;display:flex;align-items:center;gap:.6rem;
+  background:rgba(0,0,0,.35);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:.6rem;
+  padding:.5rem 1.3rem;font:inherit;font-size:1.4rem;font-weight:500;cursor:pointer;pointer-events:auto;
+  opacity:.28;transition:opacity .35s,background .2s}
+body.awake .slide.video .vskip,.slide.video .vskip:hover,.slide.video .vskip:focus-visible{opacity:1;background:rgba(0,0,0,.6)}
