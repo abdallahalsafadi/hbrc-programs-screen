@@ -7,10 +7,10 @@
 <title>لوحة الإدارة</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css?v=17">
-<script src="config.js?v=17"></script>
+<link rel="stylesheet" href="style.css?v=18">
+<script src="config.js?v=18"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=17"></script>
+<script src="common.js?v=18"></script>
 </head>
 <body>
 
@@ -30,7 +30,6 @@
     </div>
     <div class="err" id="loginErr" role="alert"></div>
     <button class="btn primary" type="submit" id="loginBtn">دخول</button>
-    <p><a href="index.html">← العودة إلى الشاشة</a></p>
   </form>
 </div>
 
@@ -55,6 +54,7 @@
       <select id="screenSel" aria-label="اختر الشاشة"></select>
       <span class="screen-link" id="screenLink" dir="ltr"></span>
       <button type="button" class="btn sm" id="copyLink">نسخ الرابط</button>
+      <button type="button" class="btn sm primary" id="pptBtn">تنزيل PowerPoint</button>
     </div>
     <nav class="tabs" role="tablist" aria-label="أقسام لوحة الإدارة">
       <button class="tab" role="tab" data-tab="programs" aria-selected="true">البرامج</button>
@@ -199,6 +199,7 @@
   </form>
 </dialog>
 
-<script src="admin.js?v=17"></script>
+<script src="pptx-export.js?v=18"></script>
+<script src="admin.js?v=18"></script>
 </body>
 </html>

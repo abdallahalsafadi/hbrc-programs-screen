@@ -192,6 +192,7 @@
 
   /* ---------- التنقل ---------- */
   function next() {
+    if (reloadNext) return reloadNext();
     if (pending) { const [s, p] = pending; stopVideo(); apply(s, p); return; }
     show(idx + 1);
   }
@@ -223,8 +224,10 @@
     const qs = sp.toString();
     const go = () => location.replace(location.pathname + (qs ? '?' + qs : ''));
     if (!player) return go();
-    const t = setInterval(() => { if (!player) { clearInterval(t); go(); } }, 2000);
+    reloadNext = go;                                   // يُعاد التحميل فور انتهاء الفيديو الحالي
+    setTimeout(go, 20 * 60 * 1000);                    // حد أمان
   }
+  let reloadNext = null;
 
   /* ---------- الساعة ---------- */
   function tick() {

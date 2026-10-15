@@ -85,6 +85,22 @@
     catch (e) { prompt('انسخ الرابط:', t); }
   }
   $('#copyLink').addEventListener('click', () => copyText(screenUrl(Store.screen)));
+
+  /* تنزيل الشاشة كملف PowerPoint */
+  async function downloadPpt() {
+    const btn = $('#pptBtn'), label = btn.textContent;
+    const vids = (S.videos || []).filter(v => v.visible !== false);
+    const files = vids.filter(v => v.kind === 'file').length;
+    let includeVideos = true;
+    if (files) includeVideos = confirm(`تضمين ${files} ملف فيديو داخل العرض؟\n(يزيد حجم الملف — اضغط «إلغاء» لتنزيل العرض بدون ملفات الفيديو)`);
+    btn.disabled = true;
+    try {
+      await PptxExport.exportScreen({ S, P, screenName: screenName(Store.screen), includeVideos, onStatus: t => { btn.textContent = t || label; } });
+      toast('تم تنزيل ملف PowerPoint', 'ok');
+    } catch (e) { console.error(e); toast(e.message || 'تعذّر إنشاء الملف', 'err'); }
+    finally { btn.disabled = false; btn.textContent = label; }
+  }
+  $('#pptBtn').addEventListener('click', downloadPpt);
   function renderScreens() {
     $('#screenRows').innerHTML = SCREENS.map(x => `<div class="row" data-slug="${esc(x.slug)}" style="${x.slug === Store.screen ? 'border-color:var(--primary)' : ''}">
         <div class="thumb" style="font-size:1rem">${x.slug === 'main' ? '★' : esc(x.slug.charAt(0).toUpperCase())}</div>
@@ -93,6 +109,7 @@
         <div class="row-actions">
           <button class="btn sm primary" data-s="edit">${icons.edit} تعديل المحتوى</button>
           <button class="btn sm" data-s="copy">${icons.copy} نسخ الرابط</button>
+          <button class="btn sm" data-s="ppt">${icons.download} PowerPoint</button>
           <a class="btn sm" href="${esc(screenUrl(x.slug))}" target="_blank">${icons.link} فتح</a>
           <button class="btn sm" data-s="ren">إعادة تسمية</button>
           ${x.slug === 'main' ? '' : `<button class="btn sm danger" data-s="del" aria-label="حذف">${icons.trash}</button>`}
@@ -104,6 +121,7 @@
     const a = b.dataset.s;
     if (a === 'edit') { await switchScreen(slug); $('[data-tab=programs]').click(); window.scrollTo(0, 0); return; }
     if (a === 'copy') return copyText(screenUrl(slug));
+    if (a === 'ppt') { if (slug !== Store.screen) await switchScreen(slug, true); return downloadPpt(); }
     if (a === 'ren') {
       const n = prompt('الاسم الجديد للشاشة:', x.name); if (!n || !n.trim()) return;
       return busy(null, async () => { await Store.renameScreen(slug, n.trim()); x.name = n.trim(); renderScreenBar(); renderScreens(); toast('تم تغيير الاسم', 'ok'); });
