@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>شاشة البرامج</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="tv.css">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+</head>
+<body>
+<div class="stage">
+  <header class="top">
+    <div class="brand"><span id="logo"></span><div class="name" id="name"></div></div>
+    <div class="clock" id="clock"><span class="t" id="time"></span><span class="d" id="date"></span></div>
+  </header>
+  <main class="slides" id="slides"><div class="loading">جارٍ التحميل…</div></main>
+  <footer class="foot"><div class="dots" id="dots"></div><div class="timer"><i id="timer"></i></div></footer>
+</div>
+<div class="hint" id="hint">اضغط على الشاشة للعرض بملء الشاشة</div>
+<script src="tv.js"></script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>لوحة الإدارة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+</head>
+<body>
+
+<!-- شاشة الدخول -->
+<div id="loginView" class="login-wrap" hidden>
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <span id="loginLogo"></span>
+    <h1>لوحة إدارة المحتوى</h1>
+    <p id="loginSub"></p>
+    <div class="field">
+      <label for="lu">اسم المستخدم</label>
+      <input type="text" id="lu" name="username" autocomplete="username" required dir="ltr">
+    </div>
+    <div class="field">
+      <label for="lp">كلمة المرور</label>
+      <input type="password" id="lp" name="password" autocomplete="current-password" required dir="ltr">
+    </div>
+    <div class="err" id="loginErr" role="alert"></div>
+    <button class="btn primary" type="submit" id="loginBtn">دخول</button>
+    <p><a href="index.html">← العودة إلى الشاشة</a></p>
+  </form>
+</div>
+
+<!-- لوحة الإدارة -->
+<div id="appView" hidden>
+  <header class="admin-bar">
+    <div class="wrap">
+      <div class="brand"><span id="adminLogo"></span><h1>لوحة الإدارة</h1></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a class="btn sm" style="background:transparent;border-color:rgba(255,255,255,.5)" href="index.html" target="_blank">عرض الشاشة ↗</a>
+        <button class="btn sm" style="background:transparent;border-color:rgba(255,255,255,.5)" id="logoutBtn">تسجيل الخروج</button>
+      </div>
+    </div>
+  </header>
+  <div class="demo-note" id="demoNote" hidden>
+    وضع تجريبي: البيانات تُحفظ في هذا المتصفح فقط. لنشر الموقع وربطه بقاعدة البيانات اتبع ملف «اقرأني».
+  </div>
+
+  <main class="wrap">
+    <nav class="tabs" role="tablist" aria-label="أقسام لوحة الإدارة">
+      <button class="tab" role="tab" data-tab="programs" aria-selected="true">البرامج</button>
+      <button class="tab" role="tab" data-tab="videos" aria-selected="false">الفيديو</button>
+      <button class="tab" role="tab" data-tab="content" aria-selected="false">النصوص والشعار</button>
+      <button class="tab" role="tab" data-tab="look" aria-selected="false">الشاشة والألوان</button>
+      <button class="tab" role="tab" data-tab="backup" aria-selected="false">النسخ الاحتياطي</button>
+      <button class="tab" role="tab" data-tab="account" aria-selected="false">الحساب</button>
+    </nav>
+
+    <section id="tab-programs" class="panel">
+      <h2>البرامج</h2>
+      <p class="hint">الترتيب هنا هو ترتيب الظهور على الشاشة. التغييرات تظهر على التلفاز خلال دقيقة.</p>
+      <div class="toolbar">
+        <button class="btn primary" id="addBtn"></button>
+        <div class="search"><input id="aq" type="search" placeholder="بحث…" aria-label="بحث في البرامج"><span id="aqIcon"></span></div>
+        <div class="field" style="min-width:200px">
+          <select id="af" aria-label="تصفية حسب الحالة">
+            <option value="">كل الحالات</option>
+            <option value="current">حالي</option>
+            <option value="upcoming">قادم</option>
+            <option value="completed">منتهٍ</option>
+            <option value="hidden">مخفي</option>
+          </select>
+        </div>
+      </div>
+      <div class="rows" id="rows"></div>
+    </section>
+
+    <section id="tab-videos" class="panel" hidden>
+      <h2>الفيديو</h2>
+      <p class="hint">اختر ما يُعرض على الشاشة. الفيديو يُعرض بملء الشاشة وينتقل تلقائياً عند انتهائه.</p>
+      <div class="field"><span class="label">وضع العرض</span><div id="vidMode" style="display:flex;gap:28px;flex-wrap:wrap"></div></div>
+      <label class="check"><input type="checkbox" id="vidSound"> تشغيل الصوت (إن سمح المتصفح بذلك)</label>
+      <div class="form-grid" style="margin:18px 0 24px">
+        <div class="field full"><label for="vidTitle">عنوان الفيديو (اختياري)</label><input type="text" id="vidTitle"></div>
+        <div class="field"><label for="ytUrl">رابط يوتيوب</label><div style="display:flex;gap:8px"><input type="url" id="ytUrl" dir="ltr" placeholder="https://youtu.be/..."><button type="button" class="btn primary" id="ytAdd">إضافة</button></div><small>يُفضّل للفيديوهات الطويلة. اجعله «غير مُدرج» إن لم تُرد نشره للعامة.</small></div>
+        <div class="field"><span class="label">أو رفع ملف فيديو</span><label class="btn" for="vidFile" id="vidFileLbl">اختر ملف MP4…</label><input type="file" id="vidFile" accept="video/mp4,video/webm" hidden><small id="vidUpHint"></small></div>
+      </div>
+      <div class="rows" id="vidRows"></div>
+    </section>
+
+    <section id="tab-content" class="panel" hidden>
+      <h2>النصوص والشعار</h2>
+      <p class="hint">التعديلات تظهر على الشاشة خلال دقيقة.</p>
+      <form id="contentForm"></form>
+    </section>
+
+    <section id="tab-look" class="panel" hidden>
+      <h2>الشاشة والألوان</h2>
+      <p class="hint">مدة الشرائح، عدد البرامج في كل شريحة، الألوان والخط.</p>
+      <form id="lookForm"></form>
+    </section>
+
+    <section id="tab-backup" class="panel" hidden>
+      <h2>النسخ الاحتياطي</h2>
+      <p class="hint">احفظ نسخة كاملة من البرامج والإعدادات في ملف على جهازك، واستعدها متى شئت.</p>
+      <div class="form-actions" style="margin-top:0">
+        <button class="btn primary" id="exportBtn">تنزيل نسخة احتياطية</button>
+        <label class="btn" for="importFile">استيراد نسخة احتياطية…</label>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+        <button class="btn danger" id="resetDemo" hidden>إعادة البيانات التجريبية</button>
+      </div>
+    </section>
+
+    <section id="tab-account" class="panel" hidden>
+      <h2>الحساب</h2>
+      <p class="hint" id="accountHint"></p>
+      <form id="pwForm" class="form-grid" style="max-width:720px">
+        <div class="field" id="newUserField" hidden><label for="nu">اسم المستخدم</label><input type="text" id="nu" dir="ltr" autocomplete="username"></div>
+        <div class="field"><label for="np1">كلمة المرور الجديدة</label><input type="password" id="np1" dir="ltr" autocomplete="new-password" minlength="8" required></div>
+        <div class="field"><label for="np2">تأكيد كلمة المرور</label><input type="password" id="np2" dir="ltr" autocomplete="new-password" minlength="8" required></div>
+        <div class="field full"><small>8 أحرف على الأقل. يُفضّل خليط من الحروف والأرقام والرموز.</small></div>
+        <div class="form-actions field full" style="margin-top:0"><button class="btn primary" type="submit">تغيير كلمة المرور</button></div>
+      </form>
+    </section>
+  </main>
+</div>
+
+<!-- محرر البرنامج -->
+<dialog id="editor" aria-labelledby="edTitle">
+  <form id="progForm" method="dialog" novalidate>
+    <div class="editor-head"><h2 id="edTitle">برنامج</h2><button type="button" class="dlg-close" style="position:static" data-close aria-label="إغلاق"></button></div>
+    <div class="editor-body"><div class="form-grid" id="progFields"></div></div>
+    <div class="editor-foot">
+      <button class="btn primary" type="submit" id="saveProg">حفظ</button>
+      <button class="btn" type="button" data-close>إلغاء</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="admin.js"></script>
+</body>
+</html>
