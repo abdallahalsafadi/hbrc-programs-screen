@@ -6,8 +6,8 @@
     Project Settings → API → Project URL  و  anon public key
 */
 window.APP_CONFIG = {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: "",
+  SUPABASE_URL: "https://sekwsghbbsvipgtylmpd.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_4hROEqu4dXJaQzr-vyz22Q_iSCZlCrM",
 
   // اسم المستخدم "admin" يتحول تلقائياً إلى البريد admin@hbrc-admin.local
   // (هذا هو الحساب الذي تنشئه في Supabase → Authentication → Users)

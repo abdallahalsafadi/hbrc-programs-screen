@@ -74,6 +74,11 @@ create policy "read settings"   on public.settings for select using (true);
 create policy "insert settings" on public.settings for insert with check (public.is_admin());
 create policy "update settings" on public.settings for update using (public.is_admin()) with check (public.is_admin());
 
+-- صلاحيات واجهة البيانات (الحماية الفعلية عبر السياسات أعلاه)
+grant usage on schema public to anon, authenticated;
+grant select on public.programs, public.settings to anon;
+grant select, insert, update, delete on public.programs, public.settings to authenticated;
+
 -- 4) تخزين الصور -----------------------------------------------------------
 insert into storage.buckets (id, name, public) values ('media', 'media', true) on conflict (id) do nothing;
 -- صور حتى 5MB وفيديو MP4 حتى 50MB (حد الخطة المجانية)
