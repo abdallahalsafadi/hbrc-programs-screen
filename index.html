@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+// الأجهزة والمتصفحات القديمة (مثل متصفح التلفاز) تُحوَّل تلقائياً إلى النسخة الخفيفة
+(function(){var q=location.search;if(q.indexOf('full')>-1)return;
+var old=q.indexOf('lite')>-1||!window.Promise||!window.fetch||!window.CSS||!CSS.supports||!CSS.supports('color','color-mix(in srgb, red 50%, blue)');
+if(old)location.replace('lite.html'+(q?q:''));})();
+</script>
+
 <title>شاشة البرامج</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
