@@ -216,6 +216,12 @@
     timer = setTimeout(next, secs * 1000);
   }
 
+  function reloadWhenFree(q) {
+    const go = () => location.replace(location.pathname + q);
+    if (!player) return go();
+    const t = setInterval(() => { if (!player) { clearInterval(t); go(); } }, 2000);
+  }
+
   /* ---------- الساعة ---------- */
   function tick() {
     const n = new Date();
@@ -253,6 +259,14 @@
     tick(); setInterval(tick, 10000);
     wake();
     setInterval(() => load().catch(console.error), 60000);
-    setTimeout(() => { if (!player) location.reload(); }, 6 * 3600 * 1000);
+    // تحديث التصميم تلقائياً: عند رفع نسخة جديدة من الموقع تُعاد تحميل الشاشة وحدها
+    let siteVer = null;
+    const checkVer = () => fetch('version.json?ts=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
+      if (!j || !j.v) return;
+      if (siteVer === null) { siteVer = j.v; return; }
+      if (j.v !== siteVer) { reloadWhenFree('?r=' + encodeURIComponent(j.v)); }
+    }).catch(() => {});
+    checkVer(); setInterval(checkVer, 3 * 60 * 1000);
+    setTimeout(() => reloadWhenFree(''), 6 * 3600 * 1000);
   })();
 })();
