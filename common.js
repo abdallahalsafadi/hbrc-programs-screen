@@ -79,17 +79,66 @@
   const byPublic = (a, b) => ((b.featured ? 1 : 0) - (a.featured ? 1 : 0)) || byOrder(a, b);
   const fail = (error, msg) => { if (error) { console.error(error); throw new Error(msg || error.message); } };
 
+  // الشاشة الحالية: من الرابط ?s=اسم-القسم (الافتراضي main)
+  const urlScreen = (() => { try { const v = new URLSearchParams(location.search).get('s'); return v && /^[a-z0-9-]{2,40}$/.test(v) ? v : 'main'; } catch (e) { return 'main'; } })();
+  const sKey = sc => sc === 'main' ? K.s : K.s + '__' + sc;
+  const demoScreens = () => lsGet('hbrc_screens', [{ slug: 'main', name: DEFAULT_SETTINGS.siteTitle, sort_order: 0 }]);
+
   const Store = {
     demo: DEMO,
-    async getSettings() {
-      if (DEMO) return { ...DEFAULT_SETTINGS, ...lsGet(K.s, {}) };
-      const { data, error } = await sb.from('settings').select('data').eq('id', 1).maybeSingle();
+    screen: urlScreen,
+    async listScreens() {
+      if (DEMO) return demoScreens();
+      const { data, error } = await sb.from('screens').select('slug,name,sort_order').order('sort_order').order('created_at');
+      fail(error, 'تعذّر تحميل الشاشات');
+      return data || [];
+    },
+    async createScreen(slug, name, copyFrom) {
+      slug = String(slug || '').trim().toLowerCase();
+      if (!/^[a-z0-9-]{2,40}$/.test(slug)) throw new Error('رمز الرابط: حروف إنجليزية صغيرة وأرقام وشرطة (-) فقط');
+      const base = copyFrom ? await this.getSettings(copyFrom) : { ...DEFAULT_SETTINGS };
+      const data = { ...base, siteTitle: name, videos: [], displayMode: 'programs' };
+      if (DEMO) {
+        const L = demoScreens(); if (L.some(x => x.slug === slug)) throw new Error('هذا الرمز مستخدم لشاشة أخرى');
+        L.push({ slug, name, sort_order: L.length }); lsSet('hbrc_screens', L); lsSet(sKey(slug), data); return;
+      }
+      const { count } = await sb.from('screens').select('slug', { count: 'exact', head: true });
+      const { error } = await sb.from('screens').insert({ slug, name, data, sort_order: count || 0 });
+      if (error && /duplicate|unique/i.test(error.message)) throw new Error('هذا الرمز مستخدم لشاشة أخرى');
+      fail(error, 'تعذّر إنشاء الشاشة');
+    },
+    async renameScreen(slug, name) {
+      if (DEMO) { const L = demoScreens(); const x = L.find(x => x.slug === slug); if (x) x.name = name; return lsSet('hbrc_screens', L); }
+      const { error } = await sb.from('screens').update({ name }).eq('slug', slug);
+      fail(error, 'تعذّر تغيير الاسم');
+    },
+    async deleteScreen(slug) {
+      if (slug === 'main') throw new Error('لا يمكن حذف الشاشة الرئيسية');
+      if (DEMO) {
+        lsSet('hbrc_screens', demoScreens().filter(x => x.slug !== slug));
+        lsSet(K.p, lsGet(K.p, []).filter(r => (r.screen || 'main') !== slug));
+        try { localStorage.removeItem(sKey(slug)); } catch (e) {} return;
+      }
+      const { error } = await sb.from('screens').delete().eq('slug', slug);
+      fail(error, 'تعذّر حذف الشاشة');
+    },
+    async screenExists(slug) {
+      slug = slug || this.screen;
+      if (DEMO) return demoScreens().some(x => x.slug === slug);
+      const { data, error } = await sb.from('screens').select('slug').eq('slug', slug).maybeSingle();
+      fail(error, 'تعذّر تحميل الشاشة');
+      return !!data;
+    },
+    async getSettings(screen) {
+      const sc = screen || this.screen;
+      if (DEMO) return { ...DEFAULT_SETTINGS, ...lsGet(sKey(sc), {}) };
+      const { data, error } = await sb.from('screens').select('data').eq('slug', sc).maybeSingle();
       fail(error, 'تعذّر تحميل الإعدادات');
       return { ...DEFAULT_SETTINGS, ...((data && data.data) || {}) };
     },
     async saveSettings(s) {
-      if (DEMO) return lsSet(K.s, s);
-      const { error } = await sb.from('settings').upsert({ id: 1, data: s, updated_at: new Date().toISOString() });
+      if (DEMO) return lsSet(sKey(this.screen), s);
+      const { error } = await sb.from('screens').update({ data: s, updated_at: new Date().toISOString() }).eq('slug', this.screen);
       fail(error, 'تعذّر حفظ الإعدادات');
     },
     async listPrograms(all) {
@@ -97,8 +146,9 @@
       if (DEMO) {
         rows = lsGet(K.p, null);
         if (!rows) { rows = SEED.map(x => ({ ...x })); lsSet(K.p, rows); }
+        rows = rows.filter(r => (r.screen || 'main') === this.screen);
       } else {
-        const { data, error } = await sb.from('programs').select('*');
+        const { data, error } = await sb.from('programs').select('*').eq('screen', this.screen);
         fail(error, 'تعذّر تحميل البرامج');
         rows = data || [];
       }
@@ -107,6 +157,7 @@
     },
     async saveProgram(p) {
       const row = clean(p);
+      row.screen = p.screen || this.screen;
       row.updated_at = new Date().toISOString();
       if (DEMO) {
         const rows = lsGet(K.p, []);
@@ -183,19 +234,24 @@
       fail(error, 'تعذّر تغيير كلمة المرور (يجب ألا تقل عن 8 أحرف)');
     },
     async replaceAll(settings, programs) {
-      if (DEMO) { if (settings) lsSet(K.s, settings); if (programs) lsSet(K.p, programs.map(p => ({ ...clean(p), id: p.id || uid() }))); return; }
+      const sc = this.screen;
+      if (DEMO) {
+        if (settings) lsSet(sKey(sc), settings);
+        if (programs) lsSet(K.p, lsGet(K.p, []).filter(r => (r.screen || 'main') !== sc).concat(programs.map(p => ({ ...clean(p), id: uid(), screen: sc }))));
+        return;
+      }
       if (settings) await this.saveSettings(settings);
       if (programs) {
-        const { error } = await sb.from('programs').delete().not('id', 'is', null);
+        const { error } = await sb.from('programs').delete().eq('screen', sc);
         fail(error, 'تعذّر حذف البرامج القديمة');
         if (programs.length) {
-          const rows = programs.map(p => { const r = clean(p); if (r.id && !/^[0-9a-f-]{36}$/i.test(r.id)) delete r.id; return r; });
+          const rows = programs.map(p => { const r = clean(p); delete r.id; r.screen = sc; return r; });
           const { error: e2 } = await sb.from('programs').insert(rows);
           fail(e2, 'تعذّر استيراد البرامج');
         }
       }
     },
-    resetDemo() { try { [K.p, K.s, K.cred].forEach(k => localStorage.removeItem(k)); } catch (e) {} }
+    resetDemo() { try { Object.keys(localStorage).filter(k => k.indexOf('hbrc_') === 0 && k !== 'hbrc_uscale').forEach(k => localStorage.removeItem(k)); } catch (e) {} }
   };
 
   /* ===== أدوات العرض ===== */

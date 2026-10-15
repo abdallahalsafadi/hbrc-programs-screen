@@ -17,7 +17,10 @@
   }
 
   /* ========== الدخول ========== */
-  try { S = await Store.getSettings(); } catch (e) { console.error(e); }
+  let SCREENS = [];
+  const remembered = (() => { try { return localStorage.getItem('hbrc_admin_screen'); } catch (e) { return null; } })();
+  if (Store.screen === 'main' && remembered && /^[a-z0-9-]{2,40}$/.test(remembered)) Store.screen = remembered;
+  try { S = await Store.getSettings('main'); } catch (e) { console.error(e); }
   applyTheme(S);
   if (await Store.isLoggedIn().catch(() => false)) startApp(); else showLogin();
 
@@ -52,10 +55,86 @@
     $('#addBtn').innerHTML = `${icons.plus} برنامج جديد`;
     $('#aqIcon').outerHTML = icons.search;
     $('#editor [data-close].dlg-close').innerHTML = icons.close;
-    try { P = await Store.listPrograms(true); } catch (e) { toast(e.message, 'err'); }
-    renderRows(); renderContent(); renderLook(); renderVideos();
+    try { SCREENS = await Store.listScreens(); } catch (e) { toast(e.message, 'err'); }
+    if (!SCREENS.some(x => x.slug === Store.screen)) Store.screen = 'main';
+    await switchScreen(Store.screen, true);
     $('#vidUpHint').textContent = DEMO ? 'رفع الملفات يعمل بعد ربط قاعدة البيانات — استخدم يوتيوب في الوضع التجريبي.' : 'MP4 حتى 50 ميغابايت. يُحمَّل مرة واحدة ويُحفظ على جهاز التلفاز.';
   }
+
+  /* ========== شاشات الأقسام ========== */
+  const screenUrl = slug => { const base = location.href.replace(/[?#].*$/, '').replace(/admin\.html$/, ''); return base + (slug === 'main' ? '' : '?s=' + slug); };
+  const screenName = slug => (SCREENS.find(x => x.slug === slug) || {}).name || slug;
+  async function switchScreen(slug, first) {
+    Store.screen = slug;
+    try { localStorage.setItem('hbrc_admin_screen', slug); } catch (e) {}
+    try { [S, P] = await Promise.all([Store.getSettings(), Store.listPrograms(true)]); } catch (e) { toast(e.message, 'err'); }
+    applyTheme(S);
+    renderScreenBar(); renderRows(); renderContent(); renderLook(); renderVideos(); renderScreens();
+    if (!first) toast('تعدّل الآن: ' + screenName(slug), 'ok');
+  }
+  function renderScreenBar() {
+    $('#screenSel').innerHTML = SCREENS.map(x => `<option value="${esc(x.slug)}" ${x.slug === Store.screen ? 'selected' : ''}>${esc(x.name)}${x.slug === 'main' ? ' (الرئيسية)' : ''}</option>`).join('');
+    $('#screenLink').textContent = screenUrl(Store.screen);
+    $('#viewLink').href = screenUrl(Store.screen);
+  }
+  $('#screenSel').addEventListener('change', e => switchScreen(e.target.value));
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); toast('تم نسخ الرابط', 'ok'); }
+    catch (e) { prompt('انسخ الرابط:', t); }
+  }
+  $('#copyLink').addEventListener('click', () => copyText(screenUrl(Store.screen)));
+  function renderScreens() {
+    $('#screenRows').innerHTML = SCREENS.map(x => `<div class="row" data-slug="${esc(x.slug)}" style="${x.slug === Store.screen ? 'border-color:var(--primary)' : ''}">
+        <div class="thumb" style="font-size:1rem">${x.slug === 'main' ? '★' : esc(x.slug.charAt(0).toUpperCase())}</div>
+        <div><h3>${esc(x.name)} ${x.slug === Store.screen ? '<span class="tag">تعدّلها الآن</span>' : ''}</h3>
+          <div class="sub"><span dir="ltr">${esc(screenUrl(x.slug))}</span></div></div>
+        <div class="row-actions">
+          <button class="btn sm primary" data-s="edit">${icons.edit} تعديل المحتوى</button>
+          <button class="btn sm" data-s="copy">${icons.copy} نسخ الرابط</button>
+          <a class="btn sm" href="${esc(screenUrl(x.slug))}" target="_blank">${icons.link} فتح</a>
+          <button class="btn sm" data-s="ren">إعادة تسمية</button>
+          ${x.slug === 'main' ? '' : `<button class="btn sm danger" data-s="del" aria-label="حذف">${icons.trash}</button>`}
+        </div></div>`).join('');
+  }
+  $('#screenRows').addEventListener('click', async e => {
+    const b = e.target.closest('[data-s]'); if (!b) return;
+    const slug = b.closest('.row').dataset.slug, x = SCREENS.find(y => y.slug === slug);
+    const a = b.dataset.s;
+    if (a === 'edit') { await switchScreen(slug); $('[data-tab=programs]').click(); window.scrollTo(0, 0); return; }
+    if (a === 'copy') return copyText(screenUrl(slug));
+    if (a === 'ren') {
+      const n = prompt('الاسم الجديد للشاشة:', x.name); if (!n || !n.trim()) return;
+      return busy(null, async () => { await Store.renameScreen(slug, n.trim()); x.name = n.trim(); renderScreenBar(); renderScreens(); toast('تم تغيير الاسم', 'ok'); });
+    }
+    if (a === 'del') {
+      if (!confirm(`حذف شاشة «${x.name}» وكل برامجها نهائياً؟ لا يمكن التراجع.`)) return;
+      return busy(null, async () => {
+        await Store.deleteScreen(slug);
+        SCREENS = SCREENS.filter(y => y.slug !== slug);
+        if (Store.screen === slug) await switchScreen('main', true); else { renderScreenBar(); renderScreens(); }
+        toast('تم حذف الشاشة', 'ok');
+      });
+    }
+  });
+  $('#nsName').addEventListener('input', () => {
+    const sl = $('#nsSlug');
+    if (sl.dataset.touched) return;
+    const ascii = $('#nsName').value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (ascii.length >= 2) sl.value = ascii.slice(0, 40);
+  });
+  $('#nsSlug').addEventListener('input', e => { e.target.dataset.touched = '1'; e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''); });
+  $('#newScreenForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('#nsName').value.trim(), slug = $('#nsSlug').value.trim();
+    if (!name) return toast('اكتب اسم القسم', 'err');
+    busy($('#nsBtn'), async () => {
+      await Store.createScreen(slug, name, $('#nsCopy').checked ? 'main' : null);
+      SCREENS = await Store.listScreens();
+      $('#nsName').value = ''; $('#nsSlug').value = ''; delete $('#nsSlug').dataset.touched;
+      await switchScreen(slug, true);
+      toast('تم إنشاء الشاشة — يمكنك الآن إضافة برامجها', 'ok');
+    });
+  });
 
   /* ========== التبويبات ========== */
   $$('.tab').forEach(t => t.addEventListener('click', () => {
@@ -211,9 +290,9 @@
 
   /* ========== محتوى الموقع ========== */
   const CF = [
-    { k: 'siteTitle', l: 'اسم المركز (يظهر إذا لم يُرفع شعار المركز)', full: true },
+    { k: 'siteTitle', l: 'اسم المركز / القسم (يظهر إذا لم يُرفع شعار)', full: true },
     { k: 'logoUrl', l: 'شعار المؤسسة', t: 'image', full: true, h: 'يُفضّل SVG أو PNG بخلفية شفافة' },
-    { k: 'centreLogoUrl', l: 'شعار مركز حمدان للموهبة والابتكار', t: 'image', full: true, h: 'يظهر أعلى الشاشة بدل الاسم المكتوب. إن تُرك فارغاً يظهر الاسم.' },
+    { k: 'centreLogoUrl', l: 'شعار المركز / القسم', t: 'image', full: true, h: 'يظهر أعلى الشاشة بجانب شعار المؤسسة. إن تُرك فارغاً يظهر الاسم المكتوب.' },
     { k: 'labelCurrent', l: 'عنوان شريحة البرامج الحالية' },
     { k: 'labelUpcoming', l: 'عنوان شريحة البرامج القادمة' },
     { k: 'labelCompleted', l: 'عنوان شريحة البرامج المنتهية' },
@@ -286,7 +365,7 @@
     const blob = new Blob([JSON.stringify({ app: 'hbrc-programs', exported_at: new Date().toISOString(), settings: S, programs: P }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `نسخة-البرامج-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `نسخة-${Store.screen}-${new Date().toISOString().slice(0, 10)}.json`;
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
   $('#importFile').addEventListener('change', async e => {

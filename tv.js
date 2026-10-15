@@ -217,7 +217,10 @@
   }
 
   function reloadWhenFree(q) {
-    const go = () => location.replace(location.pathname + q);
+    const sp = new URLSearchParams(q.replace(/^\?/, ''));
+    if (Store.screen !== 'main') sp.set('s', Store.screen);
+    const qs = sp.toString();
+    const go = () => location.replace(location.pathname + (qs ? '?' + qs : ''));
     if (!player) return go();
     const t = setInterval(() => { if (!player) { clearInterval(t); go(); } }, 2000);
   }
@@ -255,7 +258,12 @@
 
   /* ---------- التشغيل ---------- */
   (async () => {
-    try { await load(); } catch (e) { console.error(e); $('#slides').innerHTML = '<div class="empty">تعذّر تحميل البيانات — ستتم المحاولة مجدداً</div>'; }
+    try {
+      if (Store.screen !== 'main' && !(await Store.screenExists())) {
+        $('#slides').innerHTML = '<div class="empty">هذه الشاشة غير موجودة — تأكد من الرابط</div>'; return;
+      }
+      await load();
+    } catch (e) { console.error(e); $('#slides').innerHTML = '<div class="empty">تعذّر تحميل البيانات — ستتم المحاولة مجدداً</div>'; }
     tick(); setInterval(tick, 10000);
     wake();
     setInterval(() => load().catch(console.error), 60000);
