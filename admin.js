@@ -309,6 +309,7 @@
     const V = S.videos || [];
     $('#vidMode').innerHTML = MODES.map(([k, l]) => `<label class="check"><input type="radio" name="vmode" value="${k}" ${(S.displayMode || 'programs') === k ? 'checked' : ''}> ${l}</label>`).join('');
     $('#vidSound').checked = !!S.videoSound;
+    $('#vidRepeat').value = S.progRepeat || 1;
     $('#vidRows').innerHTML = V.length ? V.map((v, i) => `<div class="row ${v.visible === false ? 'hidden-prog' : ''}" data-i="${i}">
         <div class="thumb">${icons.video}</div>
         <div><h3>${esc(v.title || (v.kind === 'youtube' ? 'فيديو يوتيوب' : 'فيديو مرفوع'))}</h3>
@@ -324,6 +325,7 @@
   async function saveVideos(msg) { await Store.saveSettings(S); renderVideos(); if (msg) toast(msg, 'ok'); }
   $('#vidMode').addEventListener('change', e => { S.displayMode = e.target.value; busy(null, () => saveVideos('تم تغيير وضع العرض')); });
   $('#vidSound').addEventListener('change', e => { S.videoSound = e.target.checked; busy(null, () => saveVideos('تم الحفظ')); });
+  $('#vidRepeat').addEventListener('change', e => { S.progRepeat = Math.min(10, Math.max(1, parseInt(e.target.value, 10) || 1)); e.target.value = S.progRepeat; busy(null, () => saveVideos('تم الحفظ')); });
   $('#ytAdd').addEventListener('click', () => {
     const url = $('#ytUrl').value.trim();
     if (!/(youtu\.be\/|v=|\/shorts\/|\/embed\/|\/live\/)[\w-]{11}/.test(url)) return toast('رابط يوتيوب غير صحيح', 'err');

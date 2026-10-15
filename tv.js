@@ -43,6 +43,12 @@
       });
     }
     const vids = (S.videos || []).filter(v => v.visible !== false && (v.kind === 'youtube' ? ytId(v.url) : safeUrl(v.url)));
+    // تكرار شرائح البرامج عدداً من المرات قبل عرض الفيديو
+    if (mode === 'both' && vids.length) {
+      const reps = Math.min(10, Math.max(1, parseInt(S.progRepeat, 10) || 1));
+      const once = slides.slice();
+      for (let r = 1; r < reps; r++) once.forEach(s => slides.push(s));
+    }
     if (mode !== 'programs') vids.forEach(v => slides.push({ type: 'video', v }));
     pruneCache(vids);
 

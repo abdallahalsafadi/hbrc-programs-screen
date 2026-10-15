@@ -17,6 +17,7 @@
     displayMode: 'programs',
     videos: [],
     videoSound: false,
+    progRepeat: 1,
     labelCurrent: 'البرامج الحالية',
     labelUpcoming: 'البرامج القادمة',
     labelCompleted: 'البرامج المنتهية',
