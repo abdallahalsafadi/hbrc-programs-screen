@@ -13,7 +13,7 @@ body.idle{cursor:none}
 .stage{position:fixed;inset:0;display:grid;grid-template-rows:auto 1fr auto;gap:2.4rem;padding:0 4rem 2.6rem;background:var(--bg)}
 
 /* top bar */
-.top{display:flex;align-items:center;justify-content:space-between;gap:2rem;background:#fff;margin:0 -4rem;padding:1.8rem 4rem;border-bottom:.45rem solid var(--accent)}
+.top{display:flex;align-items:center;justify-content:space-between;gap:2rem;background:#fff;margin:0 -4rem;padding:2.4rem 4rem 1.6rem;border-bottom:.45rem solid var(--accent)}
 .brand{display:flex;align-items:center;gap:2rem;min-width:0}
 .logo{height:6.4rem;width:auto;max-width:26rem;object-fit:contain}
 .logo.fallback{width:6.4rem;display:grid;place-items:center;color:#fff;background:var(--primary);border-radius:1.2rem;font-weight:700;font-size:3rem}
@@ -61,7 +61,7 @@ body.idle{cursor:none}
 .loading{display:grid;place-items:center;font-size:3rem;opacity:.7}
 
 /* Centre logo in header */
-.centre-logo{height:8.6rem;margin-block:-1rem;width:auto;max-width:34rem;object-fit:contain;padding-inline-start:2rem;border-inline-start:.2rem solid color-mix(in srgb,var(--text) 15%,#fff)}
+.centre-logo{height:7.8rem;margin-top:.8rem;width:auto;max-width:34rem;object-fit:contain;padding-inline-start:2rem;border-inline-start:.2rem solid color-mix(in srgb,var(--text) 15%,#fff)}
 
 /* program logo + owner */
 .tile .head{display:flex;align-items:center;gap:1.6rem}
