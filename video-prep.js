@@ -36,11 +36,11 @@
       width: v.displayWidth, height: v.displayHeight, duration, canDecode: await v.canDecode().catch(() => false) };
   }
 
-  function qualityWarn(info, size) {
+  function qualityWarn(info, size, compressed) {
     const short = Math.min(info.width || 0, info.height || 0);
     const mbps = info.duration ? size * 8 / 1e6 / info.duration : null;
     if (short && short < 720) return `دقة منخفضة (${info.width}×${info.height}) — ستبدو غير واضحة على الشاشة الكبيرة. أرسل الملف الأصلي بدقة 1080p إن وُجد.`;
-    if (mbps != null && mbps < 1.5) return `الفيديو طويل بالنسبة لحد 100 ميغابايت، لذلك ضُغط بشدة (${mbps.toFixed(1)} ميغابت/ث) وقد تظهر الصورة أقل وضوحاً. للفيديوهات الطويلة يُفضّل رابط يوتيوب.`;
+    if (compressed && mbps != null && mbps < 1.5) return `الفيديو طويل بالنسبة لحد 100 ميغابايت، لذلك ضُغط بشدة (${mbps.toFixed(1)} ميغابت/ث) وقد تظهر الصورة أقل وضوحاً. للفيديوهات الطويلة يُفضّل رابط يوتيوب.`;
     return '';
   }
 
@@ -51,7 +51,7 @@
     const target = new M.BufferTarget();
     const output = new M.Output({ format: new M.Mp4OutputFormat({ fastStart: 'in-memory' }), target });
     const video = opts.transcode ? (() => {
-      const o = { codec: 'avc', forceTranscode: true, quality: new M.Quality({ bitrate: Math.round(opts.vbps) }), keyFrameInterval: 2 };
+      const o = { codec: 'avc', forceTranscode: true, quality: new M.Quality({ bitrate: Math.round(opts.vbps) }) };
       const long = Math.max(p.width, p.height), cap = opts.maxSide;
       if (long > cap) { if (p.width >= p.height) o.width = cap - (cap % 2); else o.height = cap - (cap % 2); }
       return o;
@@ -122,7 +122,7 @@
       const maxSide = vbps < 1e6 ? 854 : vbps < 2.5e6 ? 1280 : 1920;
       const label = willCompress ? `جارٍ الضغط (${fmtMB(file.size)} ← أقل من 100 ميغابايت)` : 'جارٍ التحويل إلى MP4';
       const blob = await convert(p, file, { transcode: true, vbps, maxSide, label }, onStage);
-      if (blob.size <= MAX) return { blob, converted: true, compressed: willCompress, info, warn: qualityWarn({ ...p, width: Math.min(p.width, maxSide), height: Math.min(p.height, maxSide) }, blob.size) };
+      if (blob.size <= MAX) return { blob, converted: true, compressed: willCompress, info, warn: qualityWarn((sc => ({ ...p, width: Math.round(p.width * sc), height: Math.round(p.height * sc) }))(Math.min(1, maxSide / Math.max(p.width, p.height))), blob.size, willCompress) };
       vbps = vbps * (TARGET / blob.size) * 0.9;
     }
     throw fail(`«${file.name}»: تعذّر ضغط الفيديو إلى 100 ميغابايت. اختصر الفيديو أو ارفعه على يوتيوب وأرسل الرابط`);
