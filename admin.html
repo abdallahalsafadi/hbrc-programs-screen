@@ -7,10 +7,11 @@
 <title>لوحة الإدارة</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="style.css?v=18">
-<script src="config.js?v=18"></script>
+<link rel="stylesheet" href="style.css?v=19">
+<script src="config.js?v=19"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="common.js?v=18"></script>
+<script src="common.js?v=19"></script>
+<script src="video-prep.js?v=19"></script>
 </head>
 <body>
 
@@ -97,7 +98,7 @@
       <div class="form-grid" style="margin:18px 0 24px">
         <div class="field full"><label for="vidTitle">عنوان الفيديو (اختياري)</label><input type="text" id="vidTitle"></div>
         <div class="field"><label for="ytUrl">رابط يوتيوب</label><div style="display:flex;gap:8px"><input type="url" id="ytUrl" dir="ltr" placeholder="https://youtu.be/..."><button type="button" class="btn primary" id="ytAdd">إضافة</button></div><small>يُفضّل للفيديوهات الطويلة. اجعله «غير مُدرج» إن لم تُرد نشره للعامة.</small></div>
-        <div class="field"><span class="label">أو رفع ملف فيديو</span><label class="btn" for="vidFile" id="vidFileLbl">اختر ملف أو عدة ملفات MP4…</label><input type="file" id="vidFile" accept="video/mp4,.mp4" multiple hidden><small id="vidUpHint"></small></div>
+        <div class="field"><span class="label">أو رفع ملف فيديو</span><label class="btn" for="vidFile" id="vidFileLbl">اختر ملف فيديو أو أكثر…</label><input type="file" id="vidFile" accept="video/*,.mp4,.m4v,.mov,.qt,.webm,.mkv,.3gp,.3g2,.ts,.mts,.m2ts,.mpg,.mpeg,.ogv,.avi,.wmv,.flv" multiple hidden><small id="vidUpHint"></small><div class="prog" id="vidUpProg"></div></div>
       </div>
       <div class="rules" id="vidRules"></div>
       <div id="inboxBox"></div>
@@ -199,7 +200,7 @@
   </form>
 </dialog>
 
-<script src="pptx-export.js?v=18"></script>
-<script src="admin.js?v=18"></script>
+<script src="pptx-export.js?v=19"></script>
+<script src="admin.js?v=19"></script>
 </body>
 </html>

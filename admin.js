@@ -59,7 +59,7 @@
     try { SCREENS = await Store.listScreens(); } catch (e) { toast(e.message, 'err'); }
     if (!SCREENS.some(x => x.slug === Store.screen)) Store.screen = 'main';
     await switchScreen(Store.screen, true);
-    $('#vidUpHint').textContent = DEMO ? 'رفع الملفات يعمل بعد ربط قاعدة البيانات — استخدم يوتيوب في الوضع التجريبي.' : 'MP4 فقط · حتى 50 ميغابايت · حتى 3 دقائق.';
+    $('#vidUpHint').textContent = DEMO ? 'رفع الملفات يعمل بعد ربط قاعدة البيانات — استخدم يوتيوب في الوضع التجريبي.' : 'معظم الصيغ (MP4، MOV، WebM، MKV…) · حتى 100 ميغابايت — الأكبر يُضغط تلقائياً · بدون حد للمدة.';
   }
 
   /* ========== شاشات الأقسام ========== */
@@ -167,21 +167,23 @@
         <div><h3>${esc(v.title || (v.kind === 'youtube' ? 'فيديو يوتيوب' : 'فيديو مرفوع'))}</h3>
           <div class="sub"><span class="badge ${v.kind === 'youtube' ? 'st-upcoming' : 'st-current'}">${v.kind === 'youtube' ? 'يوتيوب' : 'ملف مرفوع'}</span>${v.sender ? `<span>من: ${esc(v.sender)}</span>` : ''}<span>${new Date(v.created_at).toLocaleString('ar-AE')}</span></div></div>
         <div class="row-actions">
-          <a class="btn sm" href="${esc(v.url)}" target="_blank" rel="noopener">${icons.eye} معاينة</a>
+          <a class="btn sm" href="${esc(v.url)}" target="_blank" rel="noopener" data-prev="${i}">${icons.eye} معاينة</a>
           <button class="btn sm primary" data-ib="ok">اعتماد ✓</button>
           <button class="btn sm danger" data-ib="no">رفض ✕</button>
         </div></div>`).join('')}</div></div>` : '';
   }
   $('#inboxBox').addEventListener('click', e => {
+    const pv = e.target.closest('[data-prev]');
+    if (pv) { const v = INBOX[+pv.dataset.prev]; if (v && v.parts && v.parts.length > 1) { e.preventDefault(); const w = window.open('', '_blank'); if (w) w.document.body.textContent = 'جارٍ تحميل الفيديو…'; VideoPrep.joinParts(v).then(u => { if (w) w.location = u; }).catch(er => { if (w) w.close(); toast(er.message, 'err'); }); } return; }
     const b = e.target.closest('[data-ib]'); if (!b) return;
     const v = INBOX[+b.closest('.row').dataset.x];
     if (b.dataset.ib === 'ok') return busy(null, async () => {
-      S.videos = [...(S.videos || []), { id: Date.now().toString(36), kind: v.kind, url: v.url, path: v.path || undefined, title: v.title || '', visible: true }];
+      S.videos = [...(S.videos || []), { id: Date.now().toString(36), kind: v.kind, url: v.url, path: v.path || undefined, parts: v.parts && v.parts.length ? v.parts : undefined, title: v.title || '', visible: true }];
       await Store.saveSettings(S); await Store.deleteInbox(v.id);
       renderVideos(); await renderInbox(); toast('تم اعتماد الفيديو — أُضيف إلى القائمة', 'ok');
     });
     if (!confirm('رفض هذا الفيديو وحذفه؟')) return;
-    busy(null, async () => { await Store.deleteInbox(v.id); if (v.path) await Store.deleteFile(v.path); await renderInbox(); toast('تم رفض الفيديو', 'ok'); });
+    busy(null, async () => { await Store.deleteInbox(v.id); await Store.deleteFile(VideoPrep.pathsOf(v)); await renderInbox(); toast('تم رفض الفيديو', 'ok'); });
   });
 
   /* ========== روابط الرفع (24 ساعة) ========== */
@@ -576,16 +578,26 @@
   $('#vidFile').addEventListener('change', async e => {
     const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
     const lbl = $('#vidFileLbl'), t = lbl.textContent, title = $('#vidTitle').value.trim();
+    const box = $('#vidUpProg');
+    box.innerHTML = files.map((f, i) => `<div class="pi" id="vpi${i}"><div class="top"><span class="nm">${esc(f.name)}</span><span class="pc" id="vpc${i}">بالانتظار</span></div><div class="bar"><i id="vpb${i}"></i></div><div class="msg" id="vpm${i}">${(f.size / 1048576).toFixed(1)} ميغابايت</div></div>`).join('');
+    const setP = (i, pct, txt) => { $('#vpb' + i).style.width = (pct || 0) + '%'; $('#vpc' + i).textContent = txt; };
+    const done = (i, okk, msg) => { $('#vpi' + i).classList.add(okk ? 'ok' : 'er'); $('#vpc' + i).textContent = okk ? '✓ تم' : '✕ لم يُرفع'; $('#vpm' + i).textContent = okk ? msg : 'السبب: ' + msg; };
+    lbl.style.pointerEvents = 'none'; lbl.style.opacity = '.6';
+    const guard = ev => { ev.preventDefault(); ev.returnValue = ''; };
+    window.addEventListener('beforeunload', guard);
     let ok = 0;
     for (let i = 0; i < files.length; i++) {
-      lbl.textContent = `جارٍ رفع ${i + 1} من ${files.length}… لا تغلق الصفحة`;
+      lbl.textContent = `جارٍ تجهيز ورفع ${i + 1} من ${files.length}… لا تغلق الصفحة`;
       try {
-        const { url, path } = await Store.uploadFile(files[i], 'video');
+        const r = await Store.uploadFile(files[i], 'video', (txt, pct) => setP(i, pct, /%$/.test(txt) || !pct ? txt : txt + ' ' + pct + '%'));
         const name = files.length > 1 ? files[i].name.replace(/\.[^.]+$/, '') : title;
-        S.videos = [...(S.videos || []), { id: Date.now().toString(36) + i, kind: 'file', url, path, title: name, visible: true }];
+        S.videos = [...(S.videos || []), { id: Date.now().toString(36) + i, kind: 'file', url: r.url, path: r.path, parts: r.parts || undefined, title: name, visible: true }];
         await Store.saveSettings(S); ok++;
-      } catch (err) { toast(`${files[i].name}: ${err.message}`, 'err'); }
+        done(i, true, 'تم الرفع' + (r.warn ? ' — تنبيه: ' + r.warn : ''));
+      } catch (err) { done(i, false, err.message || 'خطأ غير معروف'); toast(`${files[i].name}: ${err.message}`, 'err'); }
     }
+    window.removeEventListener('beforeunload', guard);
+    lbl.style.pointerEvents = ''; lbl.style.opacity = '';
     renderVideos(); $('#vidTitle').value = ''; lbl.textContent = t;
     if (ok) toast(`تم رفع ${ok} فيديو`, 'ok');
   });
@@ -605,7 +617,7 @@
         if (!v.path) return;
         const all = await Store.allScreensData().catch(() => null);
         const used = !all || all.some(x => ((x.data && x.data.videos) || []).some(o => o.path === v.path));
-        if (!used) await Store.deleteFile(v.path);   // الملف يُحذف فقط إن لم يستخدمه قسم آخر
+        if (!used) await Store.deleteFile(VideoPrep.pathsOf(v));   // الملف يُحذف فقط إن لم يستخدمه قسم آخر
       });
     }
   });

@@ -52,65 +52,16 @@
   ];
 
   // قواعد رفع الفيديو
-  const VIDEO_RULES = { maxMB: 50, maxSec: 180, types: ['video/mp4'] };
-  const VIDEO_RULES_TEXT = ['الصيغة: MP4 فقط', 'الحجم: حتى 50 ميغابايت للملف', 'المدة: حتى 3 دقائق', 'الدقة المفضّلة: 1920×1080 أفقي (16:9)', 'لأفضل جودة: أرسل الملف الأصلي من الكاميرا أو من برنامج المونتاج — لا ترسل نسخة منقولة عبر واتساب لأنها تكون مضغوطة', 'الفيديو الأطول أو الأكبر من 50 ميغابايت: ارفعه على يوتيوب (غير مُدرج) وأرسل الرابط — يُعرض بجودة عالية'];
-  function checkVideo(file) {
-    return new Promise((resolve, reject) => {
-      const isMp4 = VIDEO_RULES.types.includes(file.type) || /\.mp4$/i.test(file.name);
-      if (!isMp4) return reject(new Error(`«${file.name}»: الصيغة غير مقبولة — MP4 فقط`));
-      if (file.size > VIDEO_RULES.maxMB * 1024 * 1024) return reject(new Error(`«${file.name}»: الحجم ${(file.size / 1048576).toFixed(0)} ميغابايت — الحد الأقصى ${VIDEO_RULES.maxMB}`));
-      // قراءة المدة مباشرة من ملف MP4 (صندوق mvhd) — لا تعتمد على قدرة المتصفح على تشغيل الفيديو
-      const mp4Info = async () => {
-        const out = { duration: null, width: 0, height: 0 };
-        try {
-          const buf = new Uint8Array(await file.arrayBuffer());
-          for (let i = 4; i < buf.length - 96; i++) {
-            if (buf[i] !== 0x6d && buf[i] !== 0x74) continue;
-            const a = buf[i], b = buf[i + 1], c = buf[i + 2], d = buf[i + 3];
-            if (a === 0x6d && b === 0x76 && c === 0x68 && d === 0x64 && out.duration == null) {        // 'mvhd' = المدة
-              const dv = new DataView(buf.buffer, buf.byteOffset + i), ver = dv.getUint8(4);
-              const ts = ver === 1 ? dv.getUint32(24) : dv.getUint32(16);
-              const du = ver === 1 ? dv.getUint32(28) * 4294967296 + dv.getUint32(32) : dv.getUint32(20);
-              if (ts > 0) out.duration = du / ts;
-            } else if (a === 0x74 && b === 0x6b && c === 0x68 && d === 0x64) {                          // 'tkhd' = أبعاد الصورة
-              const dv = new DataView(buf.buffer, buf.byteOffset + i), ver = dv.getUint8(4);
-              const o = ver === 1 ? 92 : 80;
-              const w = dv.getUint32(o) / 65536, h = dv.getUint32(o + 4) / 65536;
-              if (w * h > out.width * out.height) { out.width = Math.round(w); out.height = Math.round(h); }
-            }
-          }
-        } catch (e) {}
-        return out;
-      };
-      // تقدير الجودة: الدقة ومعدّل البيانات (ميغابت/ثانية)
-      const quality = (dur, w, h) => {
-        const mbps = dur ? (file.size * 8 / 1e6) / dur : null;
-        const short = Math.min(w || 0, h || 0);
-        let warn = '';
-        if (short && short < 720) warn = `دقة منخفضة (${w}×${h}) — ستبدو غير واضحة على الشاشة الكبيرة. أرسل الملف الأصلي بدقة 1080p.`;
-        else if (mbps != null && mbps < 2.5) warn = `الملف مضغوط بشدة (${mbps.toFixed(1)} ميغابت/ث) — قد تظهر الصورة ضبابية. أرسل الملف الأصلي وليس نسخة من واتساب.`;
-        return { duration: dur, width: w, height: h, mbps, portrait: h > w, lowQuality: !!warn, warn };
-      };
-      const tooLong = d => d > VIDEO_RULES.maxSec ? new Error(`«${file.name}»: المدة ${Math.floor(d / 60)}:${String(Math.round(d % 60)).padStart(2, '0')} — الحد الأقصى ${VIDEO_RULES.maxSec / 60} دقائق`) : null;
-      mp4Info().then(mi => {
-        const fd = mi.duration;
-        if (fd != null && tooLong(fd)) return reject(tooLong(fd));
-      const v = document.createElement('video'), url = URL.createObjectURL(file);
-      let done = false;
-      const fin = (err, info) => { if (done) return; done = true; URL.revokeObjectURL(url); err ? reject(err) : resolve(info); };
-      v.preload = 'metadata';
-      v.onloadedmetadata = () => {
-        const d = v.duration;
-        if (isFinite(d) && d > VIDEO_RULES.maxSec) return fin(new Error(`«${file.name}»: المدة ${Math.floor(d / 60)}:${String(Math.round(d % 60)).padStart(2, '0')} — الحد الأقصى ${VIDEO_RULES.maxSec / 60} دقائق`));
-        fin(null, quality(isFinite(d) ? d : fd, v.videoWidth || mi.width, v.videoHeight || mi.height));
-      };
-      v.onerror = () => fin(null, quality(fd, mi.width, mi.height));   // المتصفح لا يشغّل الملف — نعتمد على ما قرأناه من الملف
-      setTimeout(() => fin(null, quality(fd, mi.width, mi.height)), 8000);
-      v.src = url;
-      });
-    });
-  }
-
+  const VIDEO_RULES = { maxMB: 100 };
+  const VIDEO_RULES_TEXT = [
+    'الحجم: حتى 100 ميغابايت — الأكبر من ذلك يُضغط تلقائياً ليصبح 100 أو أقل',
+    'الصيغ المقبولة: MP4، MOV (آيفون)، WebM، MKV، 3GP، M4V، TS، MPEG وغيرها — تُحوَّل تلقائياً إلى MP4 المناسب للتلفاز',
+    'لا يوجد حد لمدة الفيديو — لكن الفيديو الطويل جداً يُضغط أكثر فتقلّ جودته',
+    'الدقة المفضّلة: 1920×1080 أفقي (16:9)',
+    'لأفضل جودة: أرسل الملف الأصلي من الكاميرا أو من برنامج المونتاج — لا ترسل نسخة منقولة عبر واتساب لأنها تكون مضغوطة',
+    'الضغط والتحويل يتمّان على جهازك قبل الرفع ويُفضّل متصفح Chrome أو Edge — لا تغلق الصفحة حتى تظهر علامة ✓',
+    'الفيديو الطويل جداً (أكثر من 15 دقيقة تقريباً): يُفضّل رفعه على يوتيوب (غير مُدرج) وإرسال الرابط'
+  ];
   const K = { p: 'hbrc_programs', s: 'hbrc_settings', cred: 'hbrc_demo_cred', ses: 'hbrc_demo_session' };
   function lsGet(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { throw new Error('مساحة التخزين في المتصفح ممتلئة'); } }
@@ -137,7 +88,8 @@
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
   const byOrder = (a, b) => ((a.sort_order || 0) - (b.sort_order || 0)) || String(a.start_date || '9999').localeCompare(String(b.start_date || '9999'));
   const byPublic = (a, b) => ((b.featured ? 1 : 0) - (a.featured ? 1 : 0)) || byOrder(a, b);
-  const fail = (error, msg) => { if (error) { console.error(error); throw new Error(msg || error.message); } };
+  const reason = e => { const m = (e && (e.message || e.error_description || e.error)) || ''; if (window.VideoPrep && (e.statusCode || e.status)) return VideoPrep.uploadError(+(e.statusCode || e.status), { message: m }); if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'انقطع الاتصال بالإنترنت — تحقق من الشبكة'; if (/JWT|expired/i.test(m)) return 'انتهت جلسة الدخول — سجّل الدخول من جديد'; if (/row-level security|permission denied/i.test(m)) return 'لا توجد صلاحية — سجّل الدخول من جديد'; return m; };
+  const fail = (error, msg) => { if (error) { console.error(error); const r = reason(error); throw new Error(msg ? (r ? msg + ' — السبب: ' + r : msg) : r || 'حدث خطأ'); } };
 
   // الشاشة الحالية: من الرابط ?s=اسم-القسم (الافتراضي main)
   const urlScreen = (() => { try { const v = new URLSearchParams(location.search).get('s'); return v && /^[a-z0-9-]{2,40}$/.test(v) ? v : 'main'; } catch (e) { return 'main'; } })();
@@ -289,27 +241,34 @@
       res.forEach(r => fail(r.error, 'تعذّر حفظ الترتيب'));
     },
     async uploadImage(file) { return this.uploadFile(file, 'image'); },
-    async uploadFile(file, kind) {
+    async uploadFile(file, kind, onStage) {
       const isVid = kind === 'video';
-      if (isVid) await checkVideo(file);
-      else if (!file.type.startsWith('image/')) throw new Error('الرجاء اختيار ملف صورة');
+      if (!isVid && !file.type.startsWith('image/')) throw new Error(`«${file.name}»: الرجاء اختيار ملف صورة`);
       if (DEMO) {
         if (isVid) throw new Error('رفع الفيديو يعمل بعد ربط قاعدة البيانات. استخدم رابط يوتيوب في الوضع التجريبي');
         if (file.size > 1.5 * 1024 * 1024) throw new Error('في الوضع التجريبي الحد الأقصى للصورة 1.5 ميغابايت');
         return await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
       }
-      const max = isVid ? 50 : 5;
-      if (file.size > max * 1024 * 1024) throw new Error(`الحد الأقصى للحجم ${max} ميغابايت`);
-      const ext = (file.name.split('.').pop() || (isVid ? 'mp4' : 'jpg')).toLowerCase().replace(/[^a-z0-9]/g, '');
-      const path = `${isVid ? 'videos' : 'images'}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      if (isVid) {
+        if (!window.VideoPrep) throw new Error('أداة تجهيز الفيديو غير محمّلة — حدّث الصفحة');
+        const prep = await VideoPrep.prepare(file, onStage);
+        const { data } = await sb.auth.getSession();
+        const token = data && data.session && data.session.access_token;
+        if (!token) throw new Error('انتهت جلسة الدخول — سجّل الدخول من جديد');
+        const base = `videos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const up = await VideoPrep.uploadVideo(prep.blob, base, { token, onProgress: p => onStage && onStage(`جارٍ الرفع ${p}%`, p) });
+        return { ...up, warn: prep.warn, info: prep.info };
+      }
+      if (file.size > 5 * 1024 * 1024) throw new Error(`«${file.name}»: حجم الصورة ${(file.size / 1048576).toFixed(1)} ميغابايت — الحد الأقصى 5`);
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const path = `images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const { error } = await sb.storage.from('media').upload(path, file, { cacheControl: '31536000', upsert: false, contentType: file.type });
-      fail(error, isVid ? 'تعذّر رفع الفيديو' : 'تعذّر رفع الصورة');
-      const url = sb.storage.from('media').getPublicUrl(path).data.publicUrl;
-      return isVid ? { url, path } : url;
+      fail(error, 'تعذّر رفع الصورة');
+      return sb.storage.from('media').getPublicUrl(path).data.publicUrl;
     },
     async deleteFile(path) {
-      if (DEMO || !path) return;
-      const { error } = await sb.storage.from('media').remove([path]);
+      if (DEMO || !path || !path.length) return;
+      const { error } = await sb.storage.from('media').remove(Array.isArray(path) ? path : [path]);
       if (error) console.error(error);
     },
     async login(user, pw) {
@@ -414,8 +373,10 @@
     t.className = 'toast ' + (type || '');
     t.textContent = msg;
     box.appendChild(t);
-    setTimeout(() => t.classList.add('out'), 3200);
-    setTimeout(() => t.remove(), 3700);
+    const life = type === 'err' ? Math.max(8000, Math.min(20000, String(msg).length * 90)) : 3200;   // رسائل الخطأ تبقى وقتاً كافياً لقراءة السبب
+    t.title = 'اضغط للإغلاق'; t.style.cursor = 'pointer'; t.onclick = () => t.remove();
+    setTimeout(() => t.classList.add('out'), life);
+    setTimeout(() => t.remove(), life + 500);
   }
 
   const P = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
@@ -446,6 +407,6 @@
     close: I('<path d="M6 6l12 12M18 6L6 18"/>')
   };
 
-  window.App = { DEMO, Store, VIDEO_RULES, VIDEO_RULES_TEXT, checkVideo, sb, DEFAULT_SETTINGS, FONTS, SEED, applyTheme, esc, safeUrl, fmtDate, fmtRange, daysUntil, daysWord,
+  window.App = { DEMO, Store, VIDEO_RULES, VIDEO_RULES_TEXT, sb, DEFAULT_SETTINGS, FONTS, SEED, applyTheme, esc, safeUrl, fmtDate, fmtRange, daysUntil, daysWord,
     effectiveStatus, STATUS, toast, icons, lsGet, lsSet, byPublic, byOrder };
 })();

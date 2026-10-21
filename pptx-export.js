@@ -132,7 +132,8 @@
           sl.addMedia({ type: 'online', link: 'https://www.youtube.com/embed/' + ytId(v.url), x: 0, y: 0, w: W, h: H });
         } else if (v.kind === 'file' && safeUrl(v.url)) {
           try {
-            const blob = await fetch(v.url).then(r => { if (!r.ok) throw new Error(); return r.blob(); });
+            const urls = v.parts && v.parts.length > 1 ? v.parts.map(x => x.url) : [v.url];
+            const blob = new Blob(await Promise.all(urls.map(u => fetch(u).then(r => { if (!r.ok) throw new Error(); return r.blob(); }))), { type: 'video/mp4' });
             const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
             sl.addMedia({ type: 'video', data, extn: 'mp4', x: 0, y: 0, w: W, h: H });
           } catch (e) {

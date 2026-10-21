@@ -58,7 +58,7 @@
         prog.forEach(s => { slides.push(s); count++; if (count % every === 0 && vi < vids.length) slides.push({ type: 'video', v: vids[vi++] }); });
       } while (vi < vids.length);
     } else if (mode !== 'programs') vids.forEach(v => slides.push({ type: 'video', v }));
-    pruneCache(vids);
+    pruneCache(vids); setTimeout(() => warmParts(vids), 5000);
 
     // الترويسة: شعار المؤسسة + شعار المركز (أو اسمه إن لم يُرفع شعار)
     const logo = safeUrl(S.logoUrl), cl = safeUrl(S.centreLogoUrl);
@@ -127,10 +127,42 @@
     } catch (e) {}
     return url;
   }
+  // فيديو مقسّم إلى أجزاء (أكبر من 45 ميغابايت): نجمع الأجزاء في ملف واحد ونحفظها محلياً
+  async function partsSrc(v) {
+    let c = null;
+    try { if ('caches' in window) c = await caches.open(VCACHE); } catch (e) {}
+    const blobs = [];
+    for (const p of v.parts) {
+      let r = null;
+      try { r = c && await c.match(p.url); } catch (e) {}
+      if (!r) {
+        r = await fetch(p.url, { mode: 'cors' });
+        if (!r.ok) throw new Error('part ' + r.status);
+        if (c) { try { await c.put(p.url, r.clone()); } catch (e) {} }
+      }
+      blobs.push(await r.blob());
+    }
+    blobUrl = URL.createObjectURL(new Blob(blobs, { type: 'video/mp4' }));
+    return blobUrl;
+  }
+  // تنزيل أجزاء الفيديوهات الكبيرة مسبقاً في الخلفية حتى تُعرض فوراً
+  let warming = false;
+  async function warmParts(vids) {
+    if (warming || !('caches' in window)) return; warming = true;
+    try {
+      const c = await caches.open(VCACHE);
+      for (const v of vids) for (const p of (v.parts || [])) {
+        if (await c.match(p.url)) continue;
+        const r = await fetch(p.url, { mode: 'cors' }).catch(() => null);
+        if (r && r.ok) await c.put(p.url, r).catch(() => {});
+      }
+    } catch (e) {} finally { warming = false; }
+  }
   async function pruneCache(vids) {
     if (!('caches' in window)) return;
     try {
-      const keep = new Set(vids.filter(v => v.kind !== 'youtube').map(v => v.url));
+      const keep = new Set();
+      vids.filter(v => v.kind !== 'youtube').forEach(v => { keep.add(v.url); (v.parts || []).forEach(p => keep.add(p.url)); });
       const c = await caches.open(VCACHE);
       (await c.keys()).forEach(r => { if (!keep.has(r.url)) c.delete(r); });
     } catch (e) {}
@@ -164,7 +196,8 @@
     const go = () => { if (my === tok) next(); };
     const ended = () => { if (my === tok) videoEnded(); };
     clearTimeout(timer);
-    timer = setTimeout(go, 20 * 60 * 1000);                       // حدّ أمان: 20 دقيقة كحد أقصى
+    timer = setTimeout(go, 10 * 60 * 1000);                       // حدّ أمان للتحميل — يُعدَّل حسب مدة الفيديو بعد معرفتها
+    const byDuration = d => { if (my !== tok || !isFinite(d) || d <= 0) return; clearTimeout(timer); timer = setTimeout(go, (d + 90) * 1000); };
     if (v.kind === 'youtube') {
       await loadYT();
       const el = document.createElement('div'); box.appendChild(el);
@@ -174,7 +207,7 @@
         events: {
           onReady: e => { sound ? e.target.unMute() : e.target.mute(); e.target.playVideo();
             setTimeout(() => { try { if (player && player.getPlayerState && player.getPlayerState() !== 1) { player.mute(); player.playVideo(); if (sound) showSoundHint(); } } catch (x) {} }, 4000); },
-          onStateChange: e => { if (e.data === 0) ended(); },
+          onStateChange: e => { if (e.data === 1) { try { byDuration(player.getDuration()); } catch (x) {} } if (e.data === 0) ended(); },
           onError: () => setTimeout(go, 2000)
         }
       });
@@ -182,10 +215,15 @@
       const vid = document.createElement('video');
       vid.playsInline = true; vid.autoplay = true; vid.muted = !sound; vid.preload = 'auto';
       vid.onended = ended;
+      vid.onloadedmetadata = () => byDuration(vid.duration);
       vid.onerror = () => setTimeout(go, 2000);
       box.appendChild(vid);
       player = vid;
-      vid.src = await cachedSrc(v.url);
+      let src;
+      try { src = v.parts && v.parts.length > 1 ? await partsSrc(v) : await cachedSrc(v.url); }
+      catch (e) { return setTimeout(go, 2000); }
+      if (my !== tok) { if (src.startsWith('blob:')) URL.revokeObjectURL(src); return; }
+      vid.src = src;
       vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); if (sound) showSoundHint(); });
     }
   }
