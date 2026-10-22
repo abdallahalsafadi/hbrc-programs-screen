@@ -96,12 +96,14 @@
     const tvVideo = p.vcodec === 'avc';
     const tvAudio = !p.acodec || p.acodec === 'aac';
 
+    // ملف «ثقيل»: معدّل بيانات أعلى مما تحتاجه الشاشة — نخفّفه لتقليل استهلاك الإنترنت المجاني
+    const heavy = p.duration > 0 && file.size > 25 * MB && file.size * 8 / p.duration > 6.5e6;
     // 1) MP4 جاهز وحجمه مناسب → يُرفع كما هو
-    if (p.mime === 'video/mp4' && tvVideo && tvAudio && file.size <= MAX)
+    if (p.mime === 'video/mp4' && tvVideo && tvAudio && file.size <= MAX && !heavy)
       return { blob: file, converted: false, info, warn: qualityWarn(p, file.size) };
 
     // 2) الترميز مناسب لكن الحاوية مختلفة (MOV/MKV…) وحجمه مناسب → تغيير الحاوية فقط (سريع وبلا فقد جودة)
-    if (tvVideo && file.size <= MAX) {
+    if (tvVideo && file.size <= MAX && !heavy) {
       try {
         const blob = await convert(p, file, { transcode: false, label: 'جارٍ التحويل إلى MP4' }, onStage);
         if (blob.size <= MAX) return { blob, converted: true, info, warn: qualityWarn(p, blob.size) };
@@ -113,14 +115,14 @@
     const dur = p.duration > 0 ? p.duration : 0;
     if (!dur) throw fail(`«${file.name}»: تعذّر معرفة مدة الفيديو لضغطه — الملف قد يكون تالفاً`);
     const srcBps = file.size * 8 / dur;
-    let vbps = Math.min(8e6, (TARGET * 8 / dur) - AUDIO_BPS, file.size <= MAX ? srcBps * 1.05 : Infinity);
+    let vbps = Math.min(5e6, (TARGET * 8 / dur) - AUDIO_BPS, file.size <= MAX ? srcBps * 1.05 : Infinity);
     if (vbps < 150000) throw fail(`«${file.name}»: الفيديو طويل جداً (${Math.round(dur / 60)} دقيقة) ولا يمكن ضغطه إلى 100 ميغابايت بجودة مقبولة. ارفعه على يوتيوب وأرسل الرابط`);
-    const willCompress = file.size > MAX;
+    const willCompress = file.size > MAX || heavy;
     const canAvc = await p.M.canEncodeVideo('avc').catch(() => false);
     if (!canAvc) throw fail(`«${file.name}»: متصفحك لا يدعم ${willCompress ? 'ضغط' : 'تحويل'} الفيديو. استخدم Chrome أو Edge على الكمبيوتر، أو ارفعه على يوتيوب وأرسل الرابط`);
     for (let attempt = 0; attempt < 3; attempt++) {
       const maxSide = vbps < 1e6 ? 854 : vbps < 2.5e6 ? 1280 : 1920;
-      const label = willCompress ? `جارٍ الضغط (${fmtMB(file.size)} ← أقل من 100 ميغابايت)` : 'جارٍ التحويل إلى MP4';
+      const label = file.size > MAX ? `جارٍ الضغط (${fmtMB(file.size)} ← أقل من 100 ميغابايت)` : heavy ? 'جارٍ تخفيف حجم الفيديو' : 'جارٍ التحويل إلى MP4';
       const blob = await convert(p, file, { transcode: true, vbps, maxSide, label }, onStage);
       if (blob.size <= MAX) return { blob, converted: true, compressed: willCompress, info, warn: qualityWarn((sc => ({ ...p, width: Math.round(p.width * sc), height: Math.round(p.height * sc) }))(Math.min(1, maxSide / Math.max(p.width, p.height))), blob.size, willCompress) };
       vbps = vbps * (TARGET / blob.size) * 0.9;

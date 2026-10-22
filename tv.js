@@ -58,7 +58,7 @@
         prog.forEach(s => { slides.push(s); count++; if (count % every === 0 && vi < vids.length) slides.push({ type: 'video', v: vids[vi++] }); });
       } while (vi < vids.length);
     } else if (mode !== 'programs') vids.forEach(v => slides.push({ type: 'video', v }));
-    pruneCache(vids); setTimeout(() => warmParts(vids), 5000);
+    pruneCache(vids).then(() => setTimeout(() => warm(vids), 5000));
 
     // الترويسة: شعار المؤسسة + شعار المركز (أو اسمه إن لم يُرفع شعار)
     const logo = safeUrl(S.logoUrl), cl = safeUrl(S.centreLogoUrl);
@@ -115,54 +115,80 @@
     </article>`;
   }
 
-  /* ---------- الفيديو ---------- */
-  async function cachedSrc(url) {
-    if (!('caches' in window) || url.startsWith('data:')) return url;
-    try {
-      const c = await caches.open(VCACHE);
-      const hit = await c.match(url);
-      if (hit) { blobUrl = URL.createObjectURL(await hit.blob()); return blobUrl; }
-      // أول مرة: نعرض من الإنترنت ونحفظ نسخة في الخلفية حتى لا يُحمَّل الفيديو مرة أخرى
-      fetch(url, { mode: 'cors' }).then(r => { if (r.ok) c.put(url, r); }).catch(() => {});
-    } catch (e) {}
-    return url;
+  /* ---------- الفيديو: كل ملف يُنزَّل مرة واحدة فقط ثم يُعرض من ذاكرة الجهاز ---------- */
+  // الخطة المجانية تسمح بـ 5 غيغابايت تنزيل شهرياً لكل الشاشات معاً، لذلك لا نعيد تنزيل أي فيديو
+  const MB = 1048576;
+  const MEM = new Map();                 // نسخة في الذاكرة إن كان التخزين الدائم ممتلئاً أو غير مدعوم
+  const MEM_MAX = 300 * MB;
+  const DAY_CAP = 250 * MB;              // حد أمان: أقصى تنزيل فيديو لكل شاشة في اليوم
+  const diag = { cache: 'لم يُختبر', persist: '?', hits: 0, downloads: 0, skipped: 0, err: '' };
+  let memDl = 0;
+  const dayKey = () => 'hbrc-dl-' + new Date().toISOString().slice(0, 10);
+  const dlToday = () => { try { const v = +localStorage.getItem(dayKey()); return Math.max(v || 0, memDl); } catch (e) { return memDl; } };
+  const addDl = n => { memDl = dlToday() + n; try { localStorage.setItem(dayKey(), String(memDl)); } catch (e) {} };
+  let cacheP = null;
+  const openCache = () => cacheP || (cacheP = ('caches' in window ? caches.open(VCACHE) : Promise.reject(new Error('no cache'))).catch(() => { diag.cache = 'غير مدعوم'; return null; }));
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(p => { diag.persist = p ? 'نعم' : 'لا'; }).catch(() => {}); } catch (e) {}
+  const urlsOf = v => v.parts && v.parts.length > 1 ? v.parts.map(p => p.url) : [v.url];
+
+  async function isLocal(v) {
+    if (MEM.has(v.url)) return true;
+    const c = await openCache(); if (!c) return false;
+    for (const u of urlsOf(v)) if (!(await c.match(u).catch(() => null))) return false;
+    return true;
   }
-  // فيديو مقسّم إلى أجزاء (أكبر من 45 ميغابايت): نجمع الأجزاء في ملف واحد ونحفظها محلياً
-  async function partsSrc(v) {
-    let c = null;
-    try { if ('caches' in window) c = await caches.open(VCACHE); } catch (e) {}
+  async function localBlob(v) {
+    if (MEM.has(v.url)) return MEM.get(v.url);
+    const c = await openCache(); if (!c) return null;
     const blobs = [];
-    for (const p of v.parts) {
-      let r = null;
-      try { r = c && await c.match(p.url); } catch (e) {}
-      if (!r) {
-        r = await fetch(p.url, { mode: 'cors' });
-        if (!r.ok) throw new Error('part ' + r.status);
-        if (c) { try { await c.put(p.url, r.clone()); } catch (e) {} }
+    for (const u of urlsOf(v)) { const r = await c.match(u).catch(() => null); if (!r) return null; blobs.push(await r.blob()); }
+    return blobs.length === 1 ? blobs[0] : new Blob(blobs, { type: 'video/mp4' });
+  }
+  const inflight = new Map();
+  function download(v) {
+    if (inflight.has(v.url)) return inflight.get(v.url);
+    const job = (async () => {
+      if (dlToday() > DAY_CAP) { diag.skipped++; throw new Error('daily cap'); }
+      const c = await openCache(); const blobs = []; let stored = !!c;
+      for (const u of urlsOf(v)) {
+        const r = await fetch(u, { mode: 'cors' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const b = await r.blob(); addDl(b.size); blobs.push(b);
+        if (c) { try { await c.put(u, new Response(b, { headers: { 'Content-Type': 'video/mp4' } })); } catch (e) { stored = false; diag.err = (e && e.name) || String(e); } }
       }
-      blobs.push(await r.blob());
-    }
-    blobUrl = URL.createObjectURL(new Blob(blobs, { type: 'video/mp4' }));
+      diag.downloads++;
+      const blob = blobs.length === 1 ? blobs[0] : new Blob(blobs, { type: 'video/mp4' });
+      if (stored) diag.cache = 'يعمل';
+      else {
+        if (c) diag.cache = 'ممتلئ';
+        let used = 0; MEM.forEach(x => { used += x.size; });
+        if (used + blob.size <= MEM_MAX) MEM.set(v.url, blob);
+      }
+      return blob;
+    })();
+    inflight.set(v.url, job);
+    job.then(() => inflight.delete(v.url), () => inflight.delete(v.url));
+    return job;
+  }
+  async function videoSrc(v) {
+    let b = await localBlob(v);
+    if (b) diag.hits++; else b = await download(v);
+    blobUrl = URL.createObjectURL(b);
     return blobUrl;
   }
-  // تنزيل أجزاء الفيديوهات الكبيرة مسبقاً في الخلفية حتى تُعرض فوراً
+  // تنزيل مسبق في الخلفية — فيديو واحد في كل مرة، ولا يُعاد تنزيل الموجود
   let warming = false;
-  async function warmParts(vids) {
-    if (warming || !('caches' in window)) return; warming = true;
-    try {
-      const c = await caches.open(VCACHE);
-      for (const v of vids) for (const p of (v.parts || [])) {
-        if (await c.match(p.url)) continue;
-        const r = await fetch(p.url, { mode: 'cors' }).catch(() => null);
-        if (r && r.ok) await c.put(p.url, r).catch(() => {});
-      }
-    } catch (e) {} finally { warming = false; }
+  async function warm(vids) {
+    if (warming) return; warming = true;
+    try { for (const v of vids) if (v.kind !== 'youtube' && !(await isLocal(v))) await download(v).catch(() => {}); }
+    finally { warming = false; }
   }
   async function pruneCache(vids) {
     if (!('caches' in window)) return;
     try {
       const keep = new Set();
       vids.filter(v => v.kind !== 'youtube').forEach(v => { keep.add(v.url); (v.parts || []).forEach(p => keep.add(p.url)); });
+      [...MEM.keys()].forEach(k => { if (!keep.has(k)) MEM.delete(k); });
       const c = await caches.open(VCACHE);
       (await c.keys()).forEach(r => { if (!keep.has(r.url)) c.delete(r); });
     } catch (e) {}
@@ -220,8 +246,8 @@
       box.appendChild(vid);
       player = vid;
       let src;
-      try { src = v.parts && v.parts.length > 1 ? await partsSrc(v) : await cachedSrc(v.url); }
-      catch (e) { return setTimeout(go, 2000); }
+      try { src = await videoSrc(v); }
+      catch (e) { diag.err = e.message; return setTimeout(go, 1500); }   // غير متاح الآن (أو تجاوز الحد اليومي): ننتقل للشريحة التالية
       if (my !== tok) { if (src.startsWith('blob:')) URL.revokeObjectURL(src); return; }
       vid.src = src;
       vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); if (sound) showSoundHint(); });
@@ -327,6 +353,20 @@
       if (j.v !== siteVer) { reloadWhenFree('?r=' + encodeURIComponent(j.v)); }
     }).catch(() => {});
     checkVer(); setInterval(checkVer, 3 * 60 * 1000);
-    setTimeout(() => reloadWhenFree(''), 6 * 3600 * 1000);
+    // إعادة تحميل يومية واحدة الساعة 4 فجراً (الفيديوهات محفوظة على الجهاز فلا تُنزَّل مجدداً)
+    const n4 = new Date(); n4.setHours(4, 0, 0, 0); if (n4 <= new Date()) n4.setDate(n4.getDate() + 1);
+    setTimeout(() => reloadWhenFree(''), n4 - new Date());
+    // فحص الشاشة: أضف ?diag=1 إلى الرابط لعرض حالة التخزين وكمية التنزيل اليوم
+    if (/[?&]diag=1/.test(location.search)) {
+      const d = document.createElement('div');
+      d.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:99;background:rgba(0,0,0,.75);color:#fff;font:16px/1.5 monospace;padding:10px 14px;border-radius:10px;direction:rtl';
+      document.body.appendChild(d);
+      const upd = async () => {
+        let est = '';
+        try { const e = await navigator.storage.estimate(); est = `${(e.usage / MB).toFixed(0)} / ${(e.quota / MB).toFixed(0)} MB`; } catch (x) { est = 'غير معروف'; }
+        d.innerHTML = `التخزين: ${diag.cache} · دائم: ${diag.persist}<br>المساحة: ${est}<br>تنزيل اليوم: ${(dlToday() / MB).toFixed(0)} MB (الحد ${DAY_CAP / MB})<br>تنزيلات: ${diag.downloads} · من الجهاز: ${diag.hits} · متجاوز: ${diag.skipped}<br>${esc(diag.err || '')}`;
+      };
+      upd(); setInterval(upd, 5000);
+    }
   })();
 })();
