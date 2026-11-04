@@ -37,11 +37,11 @@ body.idle{cursor:none}
 .tile{background:#fff;color:var(--text);border-radius:2rem;overflow:hidden;display:flex;flex-direction:column;min-height:0;box-shadow:0 .2rem .6rem rgba(13,16,16,.05),0 1.2rem 3rem rgba(13,16,16,.07)}
 .tile .img{flex:1 1 0;min-height:0;background:color-mix(in srgb,var(--primary) 12%,#fff)}
 .tile .img img{width:100%;height:100%;object-fit:cover;display:block}
-.tile .body{padding:2.2rem 2.6rem 2.4rem;display:grid;gap:1.1rem;border-top:.6rem solid var(--primary)}
+.tile .body{flex:none;padding:calc(var(--t,3.2rem) * .55) calc(var(--t,3.2rem) * .75);display:grid;gap:calc(var(--t,3.2rem) * .3);border-top:.6rem solid var(--primary)}
 .tile.noimg{justify-content:center}
 .tile.noimg .body{border-top:0;border-inline-start:.8rem solid var(--primary);height:100%;align-content:center}
-.tile h2{font-size:var(--t,3.2rem);font-weight:700;line-height:1.45;padding-bottom:.1em;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.tile .sub{font-size:calc(var(--t,3.2rem) * .55);opacity:.6;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.tile h2{font-size:var(--t,3.2rem);font-weight:700;line-height:1.45;padding-bottom:.1em;color:var(--text);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.tile .sub{font-size:calc(var(--t,3.2rem) * .55);opacity:.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .tile .meta{display:flex;align-items:center;gap:1.4rem;flex-wrap:wrap;font-size:calc(var(--t,3.2rem) * .52);font-weight:500;color:var(--primary)}
 .tile .meta svg{width:1.1em;height:1.1em;flex:none}
 .tile .date{display:flex;align-items:center;gap:.7rem}
@@ -82,3 +82,16 @@ body.idle{cursor:none}
   padding:.5rem 1.3rem;font:inherit;font-size:1.4rem;font-weight:500;cursor:pointer;pointer-events:auto;
   opacity:.28;transition:opacity .35s,background .2s}
 body.awake .slide.video .vskip,.slide.video .vskip:hover,.slide.video .vskip:focus-visible{opacity:1;background:rgba(0,0,0,.6)}
+
+/* بطاقات البرامج: معلومات المسؤول والتاريخ، ووضع مضغوط عند كثرة البرامج */
+.tile .info{display:grid;gap:calc(var(--t,3.2rem) * .25)}
+.slide.dense{gap:1.4rem}
+.slide.dense .s-head h1{font-size:3.6rem}
+.slide.dense .s-head .bar{height:3.6rem}
+.slide.dense .s-head .n{font-size:1.9rem;min-width:3.4rem;height:3.4rem;border-radius:1.7rem}
+.slide.dense .tiles{gap:1.5rem}
+.slide.dense .tile .body{padding:calc(var(--t,3.2rem) * .4) calc(var(--t,3.2rem) * .6)}
+.slide.dense .tile .info{display:flex;flex-wrap:wrap;align-items:center;gap:.2em 1.6em}
+.slide.dense .tile h2{line-height:1.35}
+.slide.dense .tile .owner{font-size:calc(var(--t,3.2rem) * .66)}
+.slide.dense .tile .meta{font-size:calc(var(--t,3.2rem) * .68)}

@@ -75,12 +75,38 @@
     $('#slides').innerHTML = slides.length ? slides.map((s, i) => s.type === 'video' ? videoHTML(s, i) : slideHTML(s)).join('') : '<div class="empty">لا يوجد محتوى للعرض</div>';
     $('#dots').innerHTML = slides.length > 1 ? slides.map(() => '<span></span>').join('') : '';
     idx = 0;
+    fitAll();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitAll).catch(() => {});
     show(0);
   }
 
+  /* ضبط حجم الخط تلقائياً: كل بطاقة تعرض نصها كاملاً (العنوان والمسؤول والتاريخ) مهما كان عدد البرامج */
+  function fitTiles(box) {
+    const tiles = [...box.querySelectorAll('.tile')];
+    if (!tiles.length) return;
+    let t = parseFloat(box.style.getPropertyValue('--t')) || 3.2;
+    const min = 1.5;
+    const bad = () => tiles.some(el => {
+      const b = el.querySelector('.body'), im = el.querySelector('.img');
+      if (!b) return false;
+      if (b.scrollHeight > el.clientHeight + 1) return true;                         // النص أكبر من البطاقة
+      if (b.scrollWidth > b.clientWidth + 1) return true;
+      if (im && im.clientHeight < el.clientHeight * 0.26) return true;               // الصورة صغيرة جداً
+      return el.querySelectorAll('h2,.sub').length && [...el.querySelectorAll('h2,.sub')].some(x => x.scrollHeight > x.clientHeight + 2);   // نص مقطوع
+    });
+    let n = 0;
+    while (bad() && t > min && n++ < 40) { t = Math.max(min, +(t * 0.94).toFixed(3)); box.style.setProperty('--t', t + 'rem'); }
+    if (bad()) {                                                                     // ما زال لا يكفي: نخفي الصور لإعطاء النص كامل المساحة
+      tiles.forEach(el => { const im = el.querySelector('.img'); if (im) { im.remove(); el.classList.add('noimg'); } });
+      n = 0; while (bad() && t > min && n++ < 40) { t = Math.max(min, +(t * 0.94).toFixed(3)); box.style.setProperty('--t', t + 'rem'); }
+    }
+  }
+  function fitAll() { document.querySelectorAll('#slides .tiles').forEach(fitTiles); }
+  window.addEventListener('resize', () => { clearTimeout(fitAll._t); fitAll._t = setTimeout(fitAll, 300); });
+
   function slideHTML(s) {
     const [cols, t] = SIZE[s.items.length] || SIZE[4];
-    return `<section class="slide">
+    return `<section class="slide${s.items.length >= 5 ? ' dense' : ''}">
       <div class="s-head"><span class="bar"></span><h1>${esc(s.label)}</h1>${s.n ? `<span class="n">${s.n}</span>` : ''}
         ${s.pages > 1 ? `<span class="pg">${s.page} / ${s.pages}</span>` : ''}</div>
       ${s.items.length
@@ -109,8 +135,10 @@
       ${img ? `<div class="img"><img src="${esc(img)}" alt=""></div>` : ''}
       <div class="body">
         <div class="head">${plogo ? `<img class="plogo" src="${esc(plogo)}" alt="">` : ''}<h2>${esc(p.title)}</h2></div>
-        ${p.owner ? `<div class="owner">${icons.user}<span>${esc(p.owner)}</span></div>` : ''}
-        ${date || chip ? `<div class="meta">${date ? `<span class="date">${icons.calendar}${esc(date)}</span>` : ''}${chip}</div>` : ''}
+        <div class="info">
+          ${p.owner ? `<div class="owner">${icons.user}<span>${esc(p.owner)}</span></div>` : ''}
+          ${date || chip ? `<div class="meta">${date ? `<span class="date">${icons.calendar}${esc(date)}</span>` : ''}${chip}</div>` : ''}
+        </div>
       </div>
     </article>`;
   }
