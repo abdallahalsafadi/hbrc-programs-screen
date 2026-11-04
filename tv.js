@@ -90,7 +90,7 @@
       const b = el.querySelector('.body'), im = el.querySelector('.img');
       if (!b) return false;
       if (b.scrollHeight > el.clientHeight + 1) return true;                         // النص أكبر من البطاقة
-      if (b.scrollWidth > b.clientWidth + 1) return true;
+      if (b.scrollWidth > b.clientWidth + 1 || box.scrollWidth > box.clientWidth + 1) return true;
       if (im && im.clientHeight < el.clientHeight * 0.26) return true;               // الصورة صغيرة جداً
       return el.querySelectorAll('h2,.sub').length && [...el.querySelectorAll('h2,.sub')].some(x => x.scrollHeight > x.clientHeight + 2);   // نص مقطوع
     });

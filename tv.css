@@ -33,7 +33,7 @@ body.idle{cursor:none}
 .s-head .n{font-size:2.4rem;font-weight:700;background:var(--primary);color:#fff;min-width:4.4rem;height:4.4rem;border-radius:2.2rem;display:grid;place-items:center;padding:0 1rem}
 .s-head .pg{margin-inline-start:auto;font-size:1.8rem;opacity:.6}
 
-.tiles{display:grid;gap:2.2rem;min-height:0;grid-template-columns:repeat(var(--cols),1fr);grid-auto-rows:1fr}
+.tiles{display:grid;gap:2.2rem;min-height:0;min-width:0;width:100%;max-width:100%;grid-template-columns:repeat(var(--cols),minmax(0,1fr));grid-auto-rows:1fr}
 .tile{background:#fff;color:var(--text);border-radius:2rem;overflow:hidden;display:flex;flex-direction:column;min-height:0;box-shadow:0 .2rem .6rem rgba(13,16,16,.05),0 1.2rem 3rem rgba(13,16,16,.07)}
 .tile .img{flex:1 1 0;min-height:0;background:color-mix(in srgb,var(--primary) 12%,#fff)}
 .tile .img img{width:100%;height:100%;object-fit:cover;display:block}
@@ -91,7 +91,13 @@ body.awake .slide.video .vskip,.slide.video .vskip:hover,.slide.video .vskip:foc
 .slide.dense .s-head .n{font-size:1.9rem;min-width:3.4rem;height:3.4rem;border-radius:1.7rem}
 .slide.dense .tiles{gap:1.5rem}
 .slide.dense .tile .body{padding:calc(var(--t,3.2rem) * .4) calc(var(--t,3.2rem) * .6)}
-.slide.dense .tile .info{display:flex;flex-wrap:wrap;align-items:center;gap:.2em 1.6em}
+.slide.dense .tile .info{display:block}
+.slide.dense .tile .info > div{display:inline-flex;vertical-align:middle;margin-inline-end:1.6em;max-width:100%}
 .slide.dense .tile h2{line-height:1.35}
 .slide.dense .tile .owner{font-size:calc(var(--t,3.2rem) * .66)}
 .slide.dense .tile .meta{font-size:calc(var(--t,3.2rem) * .68)}
+
+/* حماية من التمدّد خارج الشاشة في متصفحات التلفاز القديمة */
+.slide{overflow:hidden}
+.tile,.tile .body,.tile .info,.tile .head,.tile h2,.tile .owner,.tile .meta{min-width:0;max-width:100%}
+.tile h2,.tile .sub,.tile .owner span{overflow-wrap:anywhere;word-break:break-word}
