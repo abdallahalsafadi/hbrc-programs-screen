@@ -123,6 +123,8 @@
   const DAY_CAP = 250 * MB;              // حد أمان: أقصى تنزيل فيديو لكل شاشة في اليوم
   const diag = { cache: 'لم يُختبر', persist: '?', hits: 0, downloads: 0, skipped: 0, err: '' };
   let memDl = 0;
+  let noLocal = false; try { noLocal = localStorage.getItem('hbrc-nolocal') === '1'; } catch (e) {}
+  const setNoLocal = why => { noLocal = true; diag.err = why; try { localStorage.setItem('hbrc-nolocal', '1'); } catch (e) {} };
   const dayKey = () => 'hbrc-dl-' + new Date().toISOString().slice(0, 10);
   const dlToday = () => { try { const v = +localStorage.getItem(dayKey()); return Math.max(v || 0, memDl); } catch (e) { return memDl; } };
   const addDl = n => { memDl = dlToday() + n; try { localStorage.setItem(dayKey(), String(memDl)); } catch (e) {} };
@@ -145,10 +147,10 @@
     return blobs.length === 1 ? blobs[0] : new Blob(blobs, { type: 'video/mp4' });
   }
   const inflight = new Map();
-  function download(v) {
+  function download(v, force) {
     if (inflight.has(v.url)) return inflight.get(v.url);
     const job = (async () => {
-      if (dlToday() > DAY_CAP) { diag.skipped++; throw new Error('daily cap'); }
+      if (!force && dlToday() > DAY_CAP) { diag.skipped++; throw new Error('daily cap'); }
       const c = await openCache(); const blobs = []; let stored = !!c;
       for (const u of urlsOf(v)) {
         const r = await fetch(u, { mode: 'cors' });
@@ -172,14 +174,14 @@
   }
   async function videoSrc(v) {
     let b = await localBlob(v);
-    if (b) diag.hits++; else b = await download(v);
+    if (b) diag.hits++; else b = await download(v, true);   // التشغيل لا يُمنع بالحد اليومي (الحد للتنزيل المسبق فقط)
     blobUrl = URL.createObjectURL(b);
     return blobUrl;
   }
   // تنزيل مسبق في الخلفية — فيديو واحد في كل مرة، ولا يُعاد تنزيل الموجود
   let warming = false;
   async function warm(vids) {
-    if (warming) return; warming = true;
+    if (warming || noLocal) return; warming = true;
     try { for (const v of vids) if (v.kind !== 'youtube' && !(await isLocal(v))) await download(v).catch(() => {}); }
     finally { warming = false; }
   }
@@ -246,8 +248,18 @@
       box.appendChild(vid);
       player = vid;
       let src;
-      try { src = await videoSrc(v); }
-      catch (e) { diag.err = e.message; return setTimeout(go, 1500); }   // غير متاح الآن (أو تجاوز الحد اليومي): ننتقل للشريحة التالية
+      let direct = false;
+      const multi = v.parts && v.parts.length > 1;
+      if (noLocal && !multi) { direct = true; src = v.url; }               // هذا الجهاز لا يتحمّل نسخة محلية: بثّ مباشر
+      else {
+        try { src = await videoSrc(v); }
+        catch (e) { if (!multi) { setNoLocal('local copy failed: ' + (e && e.message)); direct = true; src = v.url; } else return setTimeout(go, 1500); }
+      }
+      vid.onerror = () => {
+        if (my !== tok) return;
+        if (!direct && !multi) { direct = true; setNoLocal('blob rejected → stream'); vid.src = v.url; vid.play().catch(() => {}); return; }   // المتصفح رفض نسخة الجهاز: جرّب الرابط المباشر مرة واحدة
+        setTimeout(go, 1500);
+      };
       if (my !== tok) { if (src.startsWith('blob:')) URL.revokeObjectURL(src); return; }
       vid.src = src;
       vid.play().catch(() => { vid.muted = true; vid.play().catch(() => {}); if (sound) showSoundHint(); });

@@ -97,7 +97,7 @@
     const tvAudio = !p.acodec || p.acodec === 'aac';
 
     // ملف «ثقيل»: معدّل بيانات أعلى مما تحتاجه الشاشة — نخفّفه لتقليل استهلاك الإنترنت المجاني
-    const heavy = p.duration > 0 && file.size > 25 * MB && file.size * 8 / p.duration > 6.5e6;
+    const heavy = Math.max(p.width, p.height) > 1920 || (p.duration > 0 && file.size > 25 * MB && file.size * 8 / p.duration > 6.5e6);   // 4K أو معدّل بيانات عالٍ: ثقيل على شاشات التلفاز
     // 1) MP4 جاهز وحجمه مناسب → يُرفع كما هو
     if (p.mime === 'video/mp4' && tvVideo && tvAudio && file.size <= MAX && !heavy)
       return { blob: file, converted: false, info, warn: qualityWarn(p, file.size) };
