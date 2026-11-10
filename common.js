@@ -268,8 +268,18 @@
     },
     async deleteFile(path) {
       if (DEMO || !path || !path.length) return;
-      const { error } = await sb.storage.from('media').remove(Array.isArray(path) ? path : [path]);
-      if (error) console.error(error);
+      const all = Array.isArray(path) ? path : [path];
+      const vids = CFG.R2_UPLOAD_API ? all.filter(p => /\.mp4$/i.test(p)) : [];
+      const rest = all.filter(p => !vids.includes(p));
+      if (vids.length) {
+        const { data } = await sb.auth.getSession(); const tk = data && data.session && data.session.access_token;
+        for (const p of vids) {
+          try { await fetch(CFG.R2_UPLOAD_API.replace(/\/$/, '') + '/' + p.split('/').map(encodeURIComponent).join('/'), { method: 'DELETE', headers: tk ? { Authorization: 'Bearer ' + tk, apikey: CFG.SUPABASE_ANON_KEY } : {} }); } catch (e) { console.error(e); }
+        }
+        // ملفات قديمة قد تكون ما زالت في Supabase
+        rest.push(...vids);
+      }
+      if (rest.length) { const { error } = await sb.storage.from('media').remove(rest); if (error) console.error(error); }
     },
     async login(user, pw) {
       user = (user || '').trim().toLowerCase();

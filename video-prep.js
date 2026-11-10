@@ -156,13 +156,21 @@
   // رفع جزء واحد مع تقدّم (XHR)
   function putFile(path, blob, token, onProg) {
     const CFG = window.APP_CONFIG || {};
+    const api = (CFG.R2_UPLOAD_API || '').replace(/\/$/, '');
     return new Promise((resolve, reject) => {
       const x = new XMLHttpRequest();
-      x.open('POST', CFG.SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/media/' + path);
-      x.setRequestHeader('apikey', CFG.SUPABASE_ANON_KEY);
-      x.setRequestHeader('Authorization', 'Bearer ' + (token || CFG.SUPABASE_ANON_KEY));
-      x.setRequestHeader('x-upsert', 'false');
-      x.setRequestHeader('cache-control', 'max-age=31536000');
+      if (api) {
+        // الرفع إلى Cloudflare R2 عبر الـ Worker
+        x.open('PUT', api + '/' + path.split('/').map(encodeURIComponent).join('/'));
+        x.setRequestHeader('apikey', CFG.SUPABASE_ANON_KEY);
+        if (token) x.setRequestHeader('Authorization', 'Bearer ' + token);
+      } else {
+        x.open('POST', CFG.SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/media/' + path);
+        x.setRequestHeader('apikey', CFG.SUPABASE_ANON_KEY);
+        x.setRequestHeader('Authorization', 'Bearer ' + (token || CFG.SUPABASE_ANON_KEY));
+        x.setRequestHeader('x-upsert', 'false');
+        x.setRequestHeader('cache-control', 'max-age=31536000');
+      }
       x.setRequestHeader('Content-Type', 'video/mp4');   // كل الفيديوهات تُرفع بصيغة MP4
       x.upload.onprogress = e => { if (e.lengthComputable && onProg) onProg(e.loaded); };
       x.onload = () => x.status >= 200 && x.status < 300 ? resolve() : reject(fail(uploadError(x.status, x.responseText)));
@@ -179,7 +187,7 @@
   async function uploadVideo(blob, base, opts) {
     opts = opts || {};
     const CFG = window.APP_CONFIG || {};
-    const pub = p => CFG.SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/public/media/' + p.split('/').map(encodeURIComponent).join('/');
+    const pub = p => (CFG.R2_PUBLIC_URL ? CFG.R2_PUBLIC_URL.replace(/\/$/, '') + '/' : CFG.SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/public/media/') + p.split('/').map(encodeURIComponent).join('/');
     const chunks = split(blob);
     const total = blob.size; let sent = 0;
     const parts = [];
