@@ -6,8 +6,8 @@
     Project Settings → API → Project URL  و  anon public key
 */
 window.APP_CONFIG = {
-  SUPABASE_URL: "https://sekwsghbbsvipgtylmpd.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_4hROEqu4dXJaQzr-vyz22Q_iSCZlCrM",
+  SUPABASE_URL: "https://kdyzdijwnslbgmejbeep.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_0Ee6YHdVaaZF22zZWSdMmQ_65GcUHKN",
 
   // الفيديوهات تُخزَّن في Cloudflare R2 (بدون حد للنقل) عبر Worker الرفع
   R2_UPLOAD_API: "https://hbrc-upload.eng-safadi92.workers.dev",
