@@ -347,11 +347,21 @@
     try { if (player.unMute) { player.unMute(); player.setVolume && player.setVolume(100); player.playVideo(); } else { player.muted = false; player.play(); } } catch (e) {}
     $('#hint').classList.add('gone');
   }
-  document.addEventListener('click', () => {
+  // ملء الشاشة تلقائياً: محاولة كل 5 ثوانٍ (تنجح في متصفحات التلفاز/وضع الكشك/التطبيق المثبّت)،
+  // ومتصفحات الحاسوب تشترط لمسة واحدة، فنعيد المحاولة مع أول ضغطة أو حركة أو زر ريموت
+  function goFull() {
     const el = document.documentElement;
-    if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => {});
-    unmute();
-  });
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    try {
+      const f = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+      if (f) { const r = f.call(el); if (r && r.catch) r.catch(() => {}); }
+    } catch (e) {}
+  }
+  setInterval(goFull, 5000);
+  setTimeout(goFull, 1500);
+  ['click', 'pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(ev => document.addEventListener(ev, () => { goFull(); }, true));
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) setTimeout(goFull, 1000); });
+  document.addEventListener('click', () => { unmute(); });
   document.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'OK' || e.keyCode === 13) unmute(); });
   document.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft') next();
