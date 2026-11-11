@@ -29,7 +29,7 @@
     showImages: true,
     showCompleted: false,
     hideEmpty: false,
-    autoStatus: false,
+    autoStatus: true,
     categories: [],
     colorPrimary: '#2C818A',
     colorAccent: '#BA9663',
@@ -348,8 +348,7 @@
     return '';
   }
   function effectiveStatus(p, s) {
-    if (!s || !s.autoStatus) return p.status || 'upcoming';
-    const t = today0();
+        const t = today0();
     if (p.end_date && toDate(p.end_date) < t) return 'completed';
     if (p.start_date && toDate(p.start_date) > t) return 'upcoming';
     if (p.start_date) return 'current';

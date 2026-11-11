@@ -455,8 +455,7 @@
     { k: 'labelUpcoming', l: 'عنوان شريحة البرامج القادمة' },
     { k: 'labelCompleted', l: 'عنوان شريحة البرامج المنتهية' },
     { k: 'showCompleted', l: 'عرض شريحة البرامج المنتهية', t: 'check' },
-    { k: 'hideEmpty', l: 'تخطّي الشريحة إذا لم تحتوِ برامج', t: 'check' },
-    { k: 'autoStatus', l: 'نقل البرنامج تلقائياً بين «قادم» و«حالي» و«منتهٍ» حسب التواريخ', t: 'check', full: true }
+    { k: 'hideEmpty', l: 'تخطّي الشريحة إذا لم تحتوِ برامج', t: 'check' }
   ];
   function renderContent() {
     const v = { ...S };
