@@ -65,7 +65,7 @@ body.idle{cursor:none}
 
 /* program logo + owner */
 .tile .head{display:flex;align-items:center;gap:1.6rem}
-.tile .plogo{flex:none;width:calc(var(--t,3.2rem) * 1.9);height:calc(var(--t,3.2rem) * 1.9);object-fit:contain;border-radius:1rem;background:#fff;border:.15rem solid color-mix(in srgb,var(--text) 10%,#fff);padding:.4rem}
+.tile .plogo{flex:none;width:calc(var(--t,3.2rem) * 2.6);height:calc(var(--t,3.2rem) * 2.6);object-fit:contain;object-position:center;border-radius:1rem;background:#fff;border:.15rem solid color-mix(in srgb,var(--text) 10%,#fff);padding:.5rem;box-sizing:border-box}
 .tile .owner{display:flex;align-items:center;gap:.7rem;font-size:calc(var(--t,3.2rem) * .5);color:color-mix(in srgb,var(--text) 70%,#fff);font-weight:500}
 .tile .owner svg{width:1.1em;height:1.1em;color:var(--accent);flex:none}
 

@@ -137,7 +137,7 @@
     return `<article class="tile ${img ? '' : 'noimg'}">
       ${img ? `<div class="img"><img src="${esc(img)}" alt=""></div>` : ''}
       <div class="body">
-        <div class="head">${plogo ? `<img class="plogo" src="${esc(plogo)}" alt="">` : ''}<h2>${esc(p.title)}</h2></div>
+        <div class="head">${plogo ? `<img class="plogo" src="${esc(plogo)}" alt="" onerror="this.remove()">` : ''}<h2>${esc(p.title)}</h2></div>
         <div class="info">
           ${p.owner ? `<div class="owner">${icons.user}<span>${esc(p.owner)}</span></div>` : ''}
           ${date || chip ? `<div class="meta">${date ? `<span class="date">${icons.calendar}${esc(date)}</span>` : ''}${chip}</div>` : ''}
