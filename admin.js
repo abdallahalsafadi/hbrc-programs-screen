@@ -479,7 +479,7 @@
   function renderLook() {
     $('#lookForm').innerHTML = `<div class="form-grid">
       <div class="field"><label for="lf-sec">مدة عرض كل شريحة (ثانية)</label><input type="number" id="lf-sec" data-k="slideSeconds" min="4" max="120" value="${esc(S.slideSeconds)}"></div>
-      <div class="field"><label for="lf-per">عدد البرامج في الشريحة الواحدة</label><select id="lf-per" data-k="perSlide">${[1, 2, 3, 4, 5, 6].map(n => `<option ${+S.perSlide === n ? 'selected' : ''}>${n}</option>`).join('')}</select><small>إذا زاد عدد البرامج تُقسَّم على أكثر من شريحة تلقائياً</small></div>
+      <div class="field"><label for="lf-per">عدد البرامج في الشريحة الواحدة</label><select id="lf-per" data-k="perSlide">${[1, 2, 3, 4].map(n => `<option ${+S.perSlide === n ? 'selected' : ''}>${n}</option>`).join('')}</select><small>إذا زاد عدد البرامج تُقسَّم على أكثر من شريحة تلقائياً</small></div>
       <div class="field"><label class="check"><input type="checkbox" data-k="showClock" ${S.showClock ? 'checked' : ''}> إظهار الساعة والتاريخ</label></div>
       <div class="field"><label class="check"><input type="checkbox" data-k="showCountdown" ${S.showCountdown ? 'checked' : ''}> إظهار «بعد X يوماً» للبرامج القادمة</label></div>
       <div class="field"><label class="check"><input type="checkbox" data-k="showImages" ${S.showImages ? 'checked' : ''}> إظهار صور البرامج</label></div>

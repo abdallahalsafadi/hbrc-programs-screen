@@ -30,7 +30,7 @@
 
   function build(P) {
     const mode = S.displayMode || 'programs';
-    const per = Math.min(6, Math.max(1, parseInt(S.perSlide, 10) || 4));
+    const per = Math.min(4, Math.max(1, parseInt(S.perSlide, 10) || 4)); // 4 برامج كحد أقصى في الشريحة
     slides = [];
     // روابط الفيديو القديمة (التخزين الموقوف مؤقتاً) لا تُشغَّل: نتجاوزها بدل الشاشة السوداء
     const playable = v => v.kind === 'youtube' ? ytId(v.url) : (safeUrl(v.url) && !/sekwsghbbsvipgtylmpd/.test(String(v.url)));
@@ -128,6 +128,33 @@
       <button type="button" class="vskip" aria-label="تخطّي الفيديو">تخطّي <span aria-hidden="true">⏭</span></button></section>`;
   }
 
+  // تكبير الشعارات تلقائياً: قصّ المساحة البيضاء/الشفافة الزائدة حول الشعار
+  document.addEventListener('load', e => {
+    const im = e.target;
+    if (!im || im.tagName !== 'IMG' || !im.classList.contains('plogo') || im.dataset.z || !im.naturalWidth) return;
+    im.dataset.z = '1';
+    try {
+      const nw = im.naturalWidth, nh = im.naturalHeight, S0 = 512, k = Math.min(1, S0 / Math.max(nw, nh));
+      const w = Math.max(1, Math.round(nw * k)), h = Math.max(1, Math.round(nh * k));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(im, 0, 0, w, h);
+      const d = g.getImageData(0, 0, w, h).data;
+      let x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (d[i + 3] > 24 && Math.min(d[i], d[i + 1], d[i + 2]) < 238) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      }
+      if (x1 < 0) return;
+      const m = Math.round(Math.max(w, h) * 0.02);
+      x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(w - 1, x1 + m); y1 = Math.min(h - 1, y1 + m);
+      const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+      if (cw * ch > w * h * 0.8) return; // الشعار يملأ الإطار أصلاً
+      const o = document.createElement('canvas'); o.width = cw; o.height = ch;
+      o.getContext('2d').drawImage(c, x0, y0, cw, ch, 0, 0, cw, ch);
+      im.src = o.toDataURL('image/png');
+    } catch (_) { /* صورة من نطاق آخر بلا CORS: نتركها كما هي */ }
+  }, true);
+
   function tile(p, key) {
     const img = S.showImages ? safeUrl(p.image_url) : '';
     const plogo = safeUrl(p.logo_url) || 'foundation-mark.svg';
@@ -140,7 +167,7 @@
     return `<article class="tile ${img ? '' : 'noimg'}">
       ${img ? `<div class="img"><img src="${esc(img)}" alt=""></div>` : ''}
       <div class="body">
-        <div class="head">${plogo ? `<img class="plogo" src="${esc(plogo)}" alt="" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='foundation-mark.svg'}else this.remove()">` : ''}<h2>${esc(p.title)}</h2></div>
+        <div class="head">${plogo ? `<img class="plogo" crossorigin="anonymous" src="${esc(plogo)}" alt="" onerror="if(this.crossOrigin){this.removeAttribute('crossorigin');this.src=this.src}else if(!this.dataset.f){this.dataset.f=1;this.src='foundation-mark.svg'}else this.remove()">` : ''}<h2>${esc(p.title)}</h2></div>
         <div class="info">
           ${p.owner ? `<div class="owner">${icons.user}<span>${esc(p.owner)}</span></div>` : ''}
           ${date || chip ? `<div class="meta">${date ? `<span class="date">${icons.calendar}${esc(date)}</span>` : ''}${chip}</div>` : ''}
