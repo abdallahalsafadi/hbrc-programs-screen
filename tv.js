@@ -32,7 +32,10 @@
     const mode = S.displayMode || 'programs';
     const per = Math.min(6, Math.max(1, parseInt(S.perSlide, 10) || 4));
     slides = [];
-    if (mode !== 'videos') {
+    // روابط الفيديو القديمة (التخزين الموقوف مؤقتاً) لا تُشغَّل: نتجاوزها بدل الشاشة السوداء
+    const playable = v => v.kind === 'youtube' ? ytId(v.url) : (safeUrl(v.url) && !/sekwsghbbsvipgtylmpd/.test(String(v.url)));
+    const okVids = (S.videos || []).filter(v => v.visible !== false && playable(v));
+    if (mode !== 'videos' || !okVids.length) {
       const groups = [['current', S.labelCurrent], ['upcoming', S.labelUpcoming]];
       // البرامج السابقة خلال السنة الحالية فقط (تظهر تلقائياً، وتُتخطّى إن لم توجد)
       const lc = (S.labelCompleted && S.labelCompleted !== 'البرامج المنتهية') ? S.labelCompleted : 'البرامج السابقة خلال السنة';
@@ -45,7 +48,7 @@
         for (let i = 0; i < pages; i++) slides.push({ type: 'prog', key, label, items: list.slice(i * per, i * per + per), n: list.length, page: i + 1, pages });
       });
     }
-    const vids = (S.videos || []).filter(v => v.visible !== false && (v.kind === 'youtube' ? ytId(v.url) : safeUrl(v.url)));
+    const vids = okVids;
     // تكرار شرائح البرامج عدداً من المرات قبل عرض الفيديو
     if (mode === 'both' && vids.length) {
       const reps = Math.min(10, Math.max(1, parseInt(S.progRepeat, 10) || 1));
@@ -399,7 +402,9 @@
     wake();
     setInterval(() => load().catch(console.error), 60000);
     // تحديث التصميم تلقائياً: عند رفع نسخة جديدة من الموقع تُعاد تحميل الشاشة وحدها
+    // النسخة المحمّلة فعلاً تُؤخذ من رابط هذا الملف، فإن كانت الصفحة قديمة في ذاكرة التلفاز تُعاد التحميل تلقائياً
     let siteVer = null;
+    try { const me = [].slice.call(document.getElementsByTagName('script')).filter(s => /tv\.js/.test(s.src))[0]; const m = me && me.src.match(/[?&]v=([^&]+)/); if (m) siteVer = m[1]; } catch (e) {}
     const checkVer = () => fetch('version.json?ts=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
       if (!j || !j.v) return;
       if (siteVer === null) { siteVer = j.v; return; }
