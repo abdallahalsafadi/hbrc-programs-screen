@@ -130,7 +130,7 @@
 
   function tile(p, key) {
     const img = S.showImages ? safeUrl(p.image_url) : '';
-    const plogo = safeUrl(p.logo_url);
+    const plogo = safeUrl(p.logo_url) || 'foundation-mark.svg';
     const date = fmtRange(p.start_date, p.end_date, S.dateLocale);
     let chip = '';
     if (key === 'upcoming' && S.showCountdown && p.start_date) {
@@ -140,7 +140,7 @@
     return `<article class="tile ${img ? '' : 'noimg'}">
       ${img ? `<div class="img"><img src="${esc(img)}" alt=""></div>` : ''}
       <div class="body">
-        <div class="head">${plogo ? `<img class="plogo" src="${esc(plogo)}" alt="" onerror="this.remove()">` : ''}<h2>${esc(p.title)}</h2></div>
+        <div class="head">${plogo ? `<img class="plogo" src="${esc(plogo)}" alt="" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='foundation-mark.svg'}else this.remove()">` : ''}<h2>${esc(p.title)}</h2></div>
         <div class="info">
           ${p.owner ? `<div class="owner">${icons.user}<span>${esc(p.owner)}</span></div>` : ''}
           ${date || chip ? `<div class="meta">${date ? `<span class="date">${icons.calendar}${esc(date)}</span>` : ''}${chip}</div>` : ''}
