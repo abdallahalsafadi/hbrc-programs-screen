@@ -21,7 +21,7 @@
     mixEvery: 2,
     labelCurrent: 'البرامج الحالية',
     labelUpcoming: 'البرامج القادمة',
-    labelCompleted: 'البرامج المنتهية',
+    labelCompleted: 'البرامج السابقة خلال السنة',
     slideSeconds: 12,
     perSlide: 4,
     showClock: true,

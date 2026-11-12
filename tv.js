@@ -34,10 +34,13 @@
     slides = [];
     if (mode !== 'videos') {
       const groups = [['current', S.labelCurrent], ['upcoming', S.labelUpcoming]];
-      if (S.showCompleted) groups.push(['completed', S.labelCompleted]);
+      // البرامج السابقة خلال السنة الحالية فقط (تظهر تلقائياً، وتُتخطّى إن لم توجد)
+      const lc = (S.labelCompleted && S.labelCompleted !== 'البرامج المنتهية') ? S.labelCompleted : 'البرامج السابقة خلال السنة';
+      groups.push(['completed', lc]);
+      const yr = String(new Date().getFullYear());
       groups.forEach(([key, label]) => {
-        const list = P.filter(p => p._st === key).sort(byPublic);
-        if (!list.length) { if (!S.hideEmpty) slides.push({ type: 'prog', key, label, items: [], n: 0 }); return; }
+        const list = P.filter(p => p._st === key && (key !== 'completed' || String(p.end_date || '').slice(0, 4) === yr)).sort(byPublic);
+        if (!list.length) { if (!S.hideEmpty && key !== 'completed') slides.push({ type: 'prog', key, label, items: [], n: 0 }); return; }
         const pages = Math.ceil(list.length / per);
         for (let i = 0; i < pages; i++) slides.push({ type: 'prog', key, label, items: list.slice(i * per, i * per + per), n: list.length, page: i + 1, pages });
       });
