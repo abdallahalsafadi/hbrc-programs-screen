@@ -35,7 +35,7 @@
     // روابط الفيديو القديمة (التخزين الموقوف مؤقتاً) لا تُشغَّل: نتجاوزها بدل الشاشة السوداء
     const playable = v => v.kind === 'youtube' ? ytId(v.url) : (safeUrl(v.url) && !/sekwsghbbsvipgtylmpd/.test(String(v.url)));
     const okVids = (S.videos || []).filter(v => v.visible !== false && playable(v));
-    if (mode !== 'videos' || !okVids.length) {
+    if (mode !== 'videos') {
       const groups = [['current', S.labelCurrent], ['upcoming', S.labelUpcoming]];
       // البرامج السابقة خلال السنة الحالية فقط (تظهر تلقائياً، وتُتخطّى إن لم توجد)
       const lc = (S.labelCompleted && S.labelCompleted !== 'البرامج المنتهية') ? S.labelCompleted : 'البرامج السابقة خلال السنة';
@@ -78,7 +78,7 @@
     document.title = S.siteTitle;
 
     stopVideo();
-    $('#slides').innerHTML = slides.length ? slides.map((s, i) => s.type === 'video' ? videoHTML(s, i) : slideHTML(s)).join('') : '<div class="empty">لا يوجد محتوى للعرض</div>';
+    $('#slides').innerHTML = slides.length ? slides.map((s, i) => s.type === 'video' ? videoHTML(s, i) : slideHTML(s)).join('') : '<div class="empty">الفيديوهات قيد التحديث وستظهر قريباً</div>';
     $('#dots').innerHTML = slides.length > 1 ? slides.map(() => '<span></span>').join('') : '';
     idx = 0;
     fitAll();
