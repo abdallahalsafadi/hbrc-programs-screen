@@ -362,7 +362,7 @@
     { k: 'status', l: 'الحالة', t: 'select', o: [['current', 'حالي'], ['upcoming', 'قادم'], ['completed', 'منتهٍ']] },
     { k: 'start_date', l: 'تاريخ البدء', t: 'date' },
     { k: 'end_date', l: 'تاريخ الانتهاء', t: 'date' },
-    { k: 'logo_url', l: 'شعار البرنامج (اختياري)', t: 'image', full: true, h: 'يظهر بجانب اسم البرنامج — يُفضّل PNG بخلفية شفافة' },
+    { k: 'logo_url', l: 'شعار البرنامج (اختياري)', t: 'image', full: true, h: 'يظهر بجانب اسم البرنامج. إن لم يُرفع شعار يظهر شعار المؤسسة (بدون النص) تلقائياً. تُقصّ المساحة البيضاء الزائدة تلقائياً.' },
     { k: 'image_url', l: 'صورة البرنامج (اختياري)', t: 'image', full: true },
     { k: 'featured', l: 'يظهر أولاً', t: 'check' },
     { k: 'visible', l: 'ظاهر على الشاشة', t: 'check' },
@@ -454,7 +454,9 @@
     { k: 'labelCurrent', l: 'عنوان شريحة البرامج الحالية' },
     { k: 'labelUpcoming', l: 'عنوان شريحة البرامج القادمة' },
     { k: 'labelCompleted', l: 'عنوان شريحة البرامج المنتهية' },
-    { k: 'showCompleted', l: 'عرض شريحة البرامج المنتهية', t: 'check' },
+    { k: 'slideCurrent', l: 'عرض شريحة البرامج الحالية', t: 'check' },
+    { k: 'slideUpcoming', l: 'عرض شريحة البرامج القادمة', t: 'check' },
+    { k: 'slidePrevious', l: 'عرض شريحة البرامج السابقة خلال السنة', t: 'check' },
     { k: 'hideEmpty', l: 'تخطّي الشريحة إذا لم تحتوِ برامج', t: 'check' }
   ];
   function renderContent() {

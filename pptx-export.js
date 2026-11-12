@@ -78,9 +78,9 @@
       if (pages > 1) slide.addText(`${page} / ${pages}`, { x: 0.45, y: 1.6, w: 1.6, h: 0.6, fontFace: FONT, fontSize: 16, color: '888888', align: 'left' });
     }
 
-    const per = Math.min(6, Math.max(1, parseInt(S.perSlide, 10) || 4));
+    const per = Math.min(4, Math.max(1, parseInt(S.perSlide, 10) || 4));
     const groups = [['current', S.labelCurrent], ['upcoming', S.labelUpcoming]];
-    if (S.showCompleted) groups.push(['completed', S.labelCompleted]);
+    if (S.slidePrevious !== false) groups.push(['completed', S.labelCompleted]);
     const list = P.filter(p => p.visible !== false && !p.pending).map(p => ({ ...p, _st: effectiveStatus(p, S) }));
     let count = 0;
 

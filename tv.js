@@ -36,10 +36,13 @@
     const playable = v => v.kind === 'youtube' ? ytId(v.url) : (safeUrl(v.url) && !/sekwsghbbsvipgtylmpd/.test(String(v.url)));
     const okVids = (S.videos || []).filter(v => v.visible !== false && playable(v));
     if (mode !== 'videos') {
-      const groups = [['current', S.labelCurrent], ['upcoming', S.labelUpcoming]];
+      // قاعدة: كل شاشة تعرض شرائح الحالية والقادمة والسابقة (خلال السنة) افتراضياً، ويمكن إيقاف أيٍّ منها من الإعدادات
+      const groups = [];
+      if (S.slideCurrent !== false) groups.push(['current', S.labelCurrent]);
+      if (S.slideUpcoming !== false) groups.push(['upcoming', S.labelUpcoming]);
       // البرامج السابقة خلال السنة الحالية فقط (تظهر تلقائياً، وتُتخطّى إن لم توجد)
       const lc = (S.labelCompleted && S.labelCompleted !== 'البرامج المنتهية') ? S.labelCompleted : 'البرامج السابقة خلال السنة';
-      groups.push(['completed', lc]);
+      if (S.slidePrevious !== false) groups.push(['completed', lc]);
       const yr = String(new Date().getFullYear());
       groups.forEach(([key, label]) => {
         const list = P.filter(p => p._st === key && (key !== 'completed' || String(p.end_date || '').slice(0, 4) === yr)).sort(byPublic);
@@ -435,7 +438,8 @@
     const checkVer = () => fetch('version.json?ts=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
       if (!j || !j.v) return;
       if (siteVer === null) { siteVer = j.v; return; }
-      if (j.v !== siteVer) { reloadWhenFree('?r=' + encodeURIComponent(j.v)); }
+      // في وضع ملء الشاشة لا نعيد التحميل أثناء النهار (يُخرج الشاشة من وضع ملء الشاشة)؛ يُطبَّق التحديث عند إعادة التحميل الليلية 4 ص
+      if (j.v !== siteVer && !document.fullscreenElement && !document.webkitFullscreenElement) { reloadWhenFree('?r=' + encodeURIComponent(j.v)); }
     }).catch(() => {});
     checkVer(); setInterval(checkVer, 3 * 60 * 1000);
     // إعادة تحميل يومية واحدة الساعة 4 فجراً (الفيديوهات محفوظة على الجهاز فلا تُنزَّل مجدداً)
